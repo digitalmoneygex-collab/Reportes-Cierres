@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: evolution_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: evolution
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - evolution_postgres_data:/var/lib/postgresql/data
+
+  evolution-api:
+    image: evoapicloud/evolution-api:latest
+    container_name: evolution_api
+    restart: always
+    depends_on:
+      - postgres
+    ports:
+      - "127.0.0.1:8081:8080"
+    environment:
+      SERVER_URL: ${SERVER_URL:-https://evolution.tailnet.ts.net}
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-9f4b61d9-1e2a-4b9d-8a6a-5f8dd6f7f5c1}
+      DATABASE_ENABLED: "true"
+      DATABASE_CONNECTION_URI: ${EVOLUTION_DB_URI:-postgres://postgres:postgres@postgres:5432/evolution}
+      PORT: "8080"
+
+volumes:
+  evolution_postgres_data:
