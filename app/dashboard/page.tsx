@@ -1,27 +1,69 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
+
+const DEFAULT_CAPTURE_WINDOW = { startTime: '06:00', endTime: '00:00' };
+
+type CaptureWindow = {
+  startTime: string;
+  endTime: string;
+};
+
+function timeToMinutes(time: string) {
+  if (!time) return 0;
+  const [hours, minutes] = time.split(':').map(Number);
+  const total = (hours || 0) * 60 + (minutes || 0);
+  return time === '00:00' ? 24 * 60 : total;
+}
+
+function isWithinCurrentDayWindow(dateIso: string, startTime: string, endTime: string) {
+  const itemDate = new Date(dateIso);
+  const today = new Date();
+
+  if (itemDate.toDateString() !== today.toDateString()) {
+    return false;
+  }
+
+  const currentMinutes = itemDate.getHours() * 60 + itemDate.getMinutes();
+  const startMinutes = timeToMinutes(startTime);
+  const endMinutes = timeToMinutes(endTime);
+
+  if (startMinutes <= endMinutes) {
+    return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+  }
+
+  return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
+}
+
+const now = new Date();
+const todayIso = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 15).toISOString();
+const yesterdayIso = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 7, 40).toISOString();
+const earlierIso = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2, 19, 10).toISOString();
+
 const payments = [
   {
     bank: 'Banco de Bogotá',
-    date: '2026-08-15',
+    date: '2026-08-16',
     time: '08:42:11',
     capture: 'CAP-1048',
     reference: 'REF-487190',
     identification: '1034567890',
     origin: 'Nequi',
     destination: 'Cuenta 0412',
-    amount: '$1.250.000',
+    amount: 1250000,
+    createdAt: todayIso,
   },
   {
     bank: 'Daviplata',
-    date: '2026-08-15',
-    time: '08:11:08',
+    date: '2026-08-16',
+    time: '09:11:08',
     capture: 'CAP-1047',
     reference: 'REF-487187',
     identification: '1012345678',
     origin: 'Bancolombia',
     destination: 'Cuenta 0148',
-    amount: '$890.000',
+    amount: 890000,
+    createdAt: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 11, 8).toISOString(),
   },
   {
     bank: 'Nequi',
@@ -32,22 +74,44 @@ const payments = [
     identification: '1098765432',
     origin: 'Daviplata',
     destination: 'Cuenta 0922',
-    amount: '$2.340.000',
+    amount: 2340000,
+    createdAt: yesterdayIso,
   },
   {
     bank: 'Bancolombia',
-    date: '2026-08-15',
+    date: '2026-08-14',
     time: '07:22:19',
     capture: 'CAP-1045',
     reference: 'REF-487109',
     identification: '1023456789',
     origin: 'Banco de Bogotá',
     destination: 'Cuenta 0515',
-    amount: '$640.000',
+    amount: 640000,
+    createdAt: earlierIso,
   },
 ];
 
 export default function DashboardPage() {
+  const [captureWindow, setCaptureWindow] = useState<CaptureWindow>(DEFAULT_CAPTURE_WINDOW);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem('capture-window');
+    if (saved) {
+      try {
+        setCaptureWindow({ ...DEFAULT_CAPTURE_WINDOW, ...JSON.parse(saved) });
+      } catch {
+        setCaptureWindow(DEFAULT_CAPTURE_WINDOW);
+      }
+    }
+  }, []);
+
+  const filteredPayments = useMemo(
+    () => payments.filter((item) => isWithinCurrentDayWindow(item.createdAt, captureWindow.startTime, captureWindow.endTime)),
+    [captureWindow]
+  );
+
+  const totalToday = filteredPayments.reduce((sum, item) => sum + item.amount, 0);
+
   return (
     <main className="shell">
       <div className="panel">
@@ -56,21 +120,44 @@ export default function DashboardPage() {
             <p className="eyebrow">Pagos</p>
             <h1>Listado de captures</h1>
           </div>
-          <span className="badge">4 registros</span>
+          <span className="badge">{filteredPayments.length} registros</span>
+        </div>
+
+        <div className="control-row">
+          <label>
+            Inicio
+            <input
+              type="time"
+              value={captureWindow.startTime}
+              onChange={(event) =>
+                setCaptureWindow((current) => ({ ...current, startTime: event.target.value }))
+              }
+            />
+          </label>
+          <label>
+            Fin
+            <input
+              type="time"
+              value={captureWindow.endTime}
+              onChange={(event) =>
+                setCaptureWindow((current) => ({ ...current, endTime: event.target.value }))
+              }
+            />
+          </label>
         </div>
 
         <div className="summary-grid">
           <div className="summary-card">
             <span>Total del día</span>
-            <strong>$5.120.000</strong>
+            <strong>{new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'VES', maximumFractionDigits: 0 }).format(totalToday)}</strong>
           </div>
           <div className="summary-card">
             <span>Capturas</span>
-            <strong>128</strong>
+            <strong>{filteredPayments.length}</strong>
           </div>
           <div className="summary-card">
-            <span>Confirmadas</span>
-            <strong>116</strong>
+            <span>Rango activo</span>
+            <strong>{captureWindow.startTime} - {captureWindow.endTime}</strong>
           </div>
         </div>
 
@@ -89,23 +176,29 @@ export default function DashboardPage() {
               </tr>
             </thead>
             <tbody>
-              {payments.map((item) => (
-                <tr key={item.capture}>
-                  <td>{item.bank}</td>
-                  <td>
-                    <div className="date-block">
-                      <span>{item.date}</span>
-                      <small>{item.time}</small>
-                    </div>
-                  </td>
-                  <td>{item.capture}</td>
-                  <td>{item.reference}</td>
-                  <td>{item.identification}</td>
-                  <td>{item.origin}</td>
-                  <td>{item.destination}</td>
-                  <td className="amount">{item.amount}</td>
+              {filteredPayments.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="empty-state">No hay captures dentro de este rango horario para el día actual.</td>
                 </tr>
-              ))}
+              ) : (
+                filteredPayments.map((item) => (
+                  <tr key={item.capture}>
+                    <td>{item.bank}</td>
+                    <td>
+                      <div className="date-block">
+                        <span>{item.date}</span>
+                        <small>{item.time}</small>
+                      </div>
+                    </td>
+                    <td>{item.capture}</td>
+                    <td>{item.reference}</td>
+                    <td>{item.identification}</td>
+                    <td>{item.origin}</td>
+                    <td>{item.destination}</td>
+                    <td className="amount">{new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'VES', maximumFractionDigits: 0 }).format(item.amount)}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -144,7 +237,7 @@ export default function DashboardPage() {
           justify-content: space-between;
           align-items: center;
           gap: 16px;
-          margin-bottom: 24px;
+          margin-bottom: 18px;
         }
 
         .eyebrow {
@@ -171,6 +264,34 @@ export default function DashboardPage() {
           font-weight: 700;
         }
 
+        .control-row {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(180px, 1fr));
+          gap: 16px;
+          margin-bottom: 22px;
+        }
+
+        .control-row label {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          font-size: 0.76rem;
+          font-weight: 700;
+          color: #475569;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+        }
+
+        .control-row input {
+          width: 100%;
+          border: 1px solid rgba(148,163,184,0.35);
+          border-radius: 12px;
+          background: #fff;
+          padding: 12px 14px;
+          font-size: 1rem;
+          color: #0f172a;
+        }
+
         .summary-grid {
           display: grid;
           grid-template-columns: repeat(3, minmax(160px, 1fr));
@@ -195,7 +316,8 @@ export default function DashboardPage() {
         }
 
         .summary-card strong {
-          font-size: clamp(1.5rem, 2vw, 2.2rem);
+          font-size: clamp(0.9rem, 1.5vw, 1.3rem);
+          line-height: 1.4;
         }
 
         .table-wrap {
@@ -219,34 +341,33 @@ export default function DashboardPage() {
           letter-spacing: 0.08em;
           padding: 14px 12px;
           text-align: left;
-          border-bottom: 1px solid rgba(148,163,184,0.2);
         }
 
         tbody td {
-          padding: 16px 12px;
-          border-bottom: 1px solid rgba(148,163,184,0.15);
-          font-size: 0.92rem;
+          padding: 14px 12px;
+          border-top: 1px solid rgba(148,163,184,0.18);
           vertical-align: middle;
         }
 
-        tbody tr:hover {
-          background: rgba(239,246,255,0.7);
-        }
-
         .date-block {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
+          display: grid;
+          gap: 4px;
         }
 
         .date-block small {
           color: #64748b;
-          font-size: 0.75rem;
         }
 
         .amount {
-          color: #059669;
-          font-weight: 800;
+          font-weight: 700;
+          color: #0f172a;
+        }
+
+        .empty-state {
+          padding: 22px 12px;
+          color: #475569;
+          text-align: center;
+          font-weight: 600;
         }
       `}</style>
     </main>

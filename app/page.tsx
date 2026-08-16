@@ -1,10 +1,62 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 
 const qrPattern = Array.from({ length: 25 }, (_, i) => i);
+const DEFAULT_CAPTURE_WINDOW = { startTime: '06:00', endTime: '00:00' };
+
+type CaptureWindow = {
+  startTime: string;
+  endTime: string;
+};
+
+function timeToMinutes(time: string) {
+  if (!time) return 0;
+  const [hours, minutes] = time.split(':').map(Number);
+  const totalMinutes = (hours || 0) * 60 + (minutes || 0);
+  return time === '00:00' ? 24 * 60 : totalMinutes;
+}
+
+function isWithinCurrentDayWindow(dateIso: string, startTime: string, endTime: string) {
+  const itemDate = new Date(dateIso);
+  const today = new Date();
+
+  if (itemDate.toDateString() !== today.toDateString()) {
+    return false;
+  }
+
+  const currentMinutes = itemDate.getHours() * 60 + itemDate.getMinutes();
+  const startMinutes = timeToMinutes(startTime);
+  const endMinutes = timeToMinutes(endTime);
+
+  if (startMinutes <= endMinutes) {
+    return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+  }
+
+  return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
+}
 
 export default function HomePage() {
+  const [captureWindow, setCaptureWindow] = useState<CaptureWindow>(DEFAULT_CAPTURE_WINDOW);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem('capture-window');
+    if (saved) {
+      try {
+        setCaptureWindow({ ...DEFAULT_CAPTURE_WINDOW, ...JSON.parse(saved) });
+      } catch {
+        setCaptureWindow(DEFAULT_CAPTURE_WINDOW);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem('capture-window', JSON.stringify(captureWindow));
+  }, [captureWindow]);
+
+  const statusText = `Captura activa: ${captureWindow.startTime} a ${captureWindow.endTime}`;
+
   return (
     <main className="shell">
       <div className="layout">
@@ -35,6 +87,41 @@ export default function HomePage() {
             <input id="slave-number" placeholder="Ej. +57 301 765 4321" />
           </div>
 
+          <div className="window-block">
+            <div className="window-label-row">
+              <span>Horario de captura</span>
+              <strong>{statusText}</strong>
+            </div>
+
+            <div className="time-grid">
+              <label>
+                Inicio
+                <input
+                  type="time"
+                  value={captureWindow.startTime}
+                  onChange={(event) =>
+                    setCaptureWindow((current) => ({ ...current, startTime: event.target.value }))
+                  }
+                />
+              </label>
+
+              <label>
+                Fin
+                <input
+                  type="time"
+                  value={captureWindow.endTime}
+                  onChange={(event) =>
+                    setCaptureWindow((current) => ({ ...current, endTime: event.target.value }))
+                  }
+                />
+              </label>
+            </div>
+
+            <p className="window-note">
+              Solo se toman registros del día actual dentro del rango configurado. No se capturan datos pasados.
+            </p>
+          </div>
+
           <div className="field-row">
             <button type="button" className="primary">Guardar conexión</button>
             <Link href="/dashboard" className="secondary">Ver pagos</Link>
@@ -47,33 +134,33 @@ export default function HomePage() {
               <p className="eyebrow subtle">Monitoreo</p>
               <h2>Capturas interceptadas</h2>
             </div>
-            <span className="metric">128 hoy</span>
+            <span className="metric">{captureWindow.startTime} - {captureWindow.endTime}</span>
           </div>
 
           <div className="stats-grid">
             <div className="stat-card">
               <span>Pagos</span>
-              <strong>84</strong>
+              <strong>{isWithinCurrentDayWindow(new Date().toISOString(), captureWindow.startTime, captureWindow.endTime) ? '01' : '00'}</strong>
             </div>
             <div className="stat-card">
               <span>OCR</span>
-              <strong>37</strong>
+              <strong>00</strong>
             </div>
             <div className="stat-card">
               <span>Errores</span>
-              <strong>02</strong>
+              <strong>00</strong>
             </div>
           </div>
 
           <div className="list-card">
             <div className="list-header">
               <span>Últimos eventos</span>
-              <span>Hace 2 min</span>
+              <span>Hoy</span>
             </div>
             <ul>
-              <li><span>Banco de Bogotá</span><strong>Capture recibido</strong></li>
-              <li><span>Daviplata</span><strong>Referencia validada</strong></li>
-              <li><span>Nequi</span><strong>Origen verificado</strong></li>
+              <li><span>Rango activo</span><strong>{captureWindow.startTime} - {captureWindow.endTime}</strong></li>
+              <li><span>Histórico</span><strong>Ignorado</strong></li>
+              <li><span>Captura</span><strong>Solo actual</strong></li>
             </ul>
           </div>
         </section>
@@ -214,6 +301,49 @@ export default function HomePage() {
           font-size: 0.98rem;
           color: #0f172a;
           outline: none;
+        }
+
+        .window-block {
+          border: 1px solid rgba(148, 163, 184, 0.28);
+          border-radius: 18px;
+          background: rgba(248, 250, 252, 0.9);
+          padding: 16px;
+          margin-bottom: 18px;
+        }
+
+        .window-label-row {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          align-items: center;
+          margin-bottom: 12px;
+          font-size: 0.78rem;
+          color: #475569;
+          font-weight: 700;
+        }
+
+        .window-label-row strong {
+          color: #0f172a;
+          font-size: 0.75rem;
+        }
+
+        .time-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(120px, 1fr));
+          gap: 12px;
+        }
+
+        .time-grid label {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .window-note {
+          margin: 12px 0 0;
+          color: #475569;
+          line-height: 1.5;
+          font-size: 0.76rem;
         }
 
         .field-row {
