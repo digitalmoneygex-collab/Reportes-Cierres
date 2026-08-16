@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
 const DEFAULT_CAPTURE_WINDOW = { startTime: '06:00', endTime: '00:00' };
@@ -120,7 +121,11 @@ export default function DashboardPage() {
             <p className="eyebrow">Pagos</p>
             <h1>Listado de captures</h1>
           </div>
-          <span className="badge">{filteredPayments.length} registros</span>
+
+          <div className="header-actions">
+            <Link href="/configuracion" className="nav-link">Configuración QR</Link>
+            <span className="badge">{filteredPayments.length} registros</span>
+          </div>
         </div>
 
         <div className="control-row">
@@ -238,6 +243,27 @@ export default function DashboardPage() {
           align-items: center;
           gap: 16px;
           margin-bottom: 18px;
+        }
+
+        .header-actions {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .nav-link {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 9px 12px;
+          border-radius: 10px;
+          background: #eff6ff;
+          border: 1px solid rgba(59,130,246,0.25);
+          color: #1d4ed8;
+          text-decoration: none;
+          font-size: 0.8rem;
+          font-weight: 700;
         }
 
         .eyebrow {
