@@ -13,7 +13,7 @@ type Config = {
 const DEFAULT: Config = {
   startTime: '06:00',
   endTime: '00:00',
-  webhookUrl: 'https://reportes-cierres.psi.vercel.app/api/webhooks/whatsapp',
+  webhookUrl: 'https://reportes-cierres-psi.vercel.app/api/webhooks/whatsapp',
   instanceName: 'mi_bot',
   numeroReceptor: '',
 };

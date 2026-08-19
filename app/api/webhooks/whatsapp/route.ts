@@ -9,15 +9,25 @@ export async function POST(request: Request) {
   try {
     const payload = await request.json();
     
-    // Solo procesamos eventos de nuevos mensajes
-    if (payload.event !== 'messages.upsert' || !payload.data?.message) {
-      return NextResponse.json({ ok: true, ignored: 'No es un mensaje nuevo' });
+    const eventName = (payload.event || '').toLowerCase();
+    
+    // Evolution v2 puede enviar 'messages.upsert' o 'MESSAGES_UPSERT'
+    if (!eventName.includes('messages') || !eventName.includes('upsert')) {
+      return NextResponse.json({ ok: true, ignored: `Evento ignorado: ${payload.event}` });
     }
 
-    const msgData = payload.data;
-    const remoteJid = msgData.key?.remoteJid || '';
-    const isFromMe = msgData.key?.fromMe || false;
+    // Evolution v2 puede envolver el mensaje en data o directamente en el payload
+    const msgData = payload.data ?? payload;
+    if (!msgData?.message && !msgData?.messages?.[0]) {
+      return NextResponse.json({ ok: true, ignored: 'Sin mensaje en el payload' });
+    }
+
+    // Normalizar el mensaje (puede venir solo o en array)
+    const msgItem = msgData.messages?.[0] ?? msgData;
+    const remoteJid = msgItem.key?.remoteJid ?? msgData.key?.remoteJid ?? '';
+    const isFromMe = msgItem.key?.fromMe ?? msgData.key?.fromMe ?? false;
     const instanceName = payload.instance;
+    const messageContent = msgItem.message ?? msgData.message;
 
     // 1. Obtener la configuración de Supabase
     const { data: config, error: cfgError } = await supabaseAdmin
@@ -52,7 +62,6 @@ export async function POST(request: Request) {
     }
 
     // 3. Verificar si es una imagen
-    const messageContent = msgData.message;
     const isImage = !!messageContent?.imageMessage;
     
     if (!isImage) {
