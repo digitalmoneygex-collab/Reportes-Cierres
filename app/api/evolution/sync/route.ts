@@ -60,12 +60,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: 'Respuesta inválida o vacía de Evolution API' });
     }
 
-    // 3. Filtrar: solo imágenes, dentro del rango horario Venezuela, no enviadas por el bot y del receptor
+    // 3. Filtrar: solo imágenes, dentro del rango horario Venezuela y del receptor
     const todayVZ = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Caracas' }); // YYYY-MM-DD
     const eligible = messages.filter(msg => {
       const jid = (msg.key.remoteJid || '') + (msg.key.remoteJidAlt || '');
       if (!jid.includes(cleanReceptor)) return false;
-      if (msg.key.fromMe) return false;
       if (!msg.message?.imageMessage) return false;
       const rawTs = msg.messageTimestamp;
       const msgDate = new Date(rawTs < 1e12 ? rawTs * 1000 : rawTs);
