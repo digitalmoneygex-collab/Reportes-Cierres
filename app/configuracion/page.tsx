@@ -1,438 +1,213 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-const DEFAULT_CAPTURE_WINDOW = { startTime: '06:00', endTime: '00:00' };
-
-type CaptureWindow = {
+type Config = {
   startTime: string;
   endTime: string;
+  webhookUrl: string;
+  instanceName: string;
+  numeroReceptor: string;
 };
 
-type ConnectResult = {
-  ok: boolean;
-  reason?: string;
-  status?: string;
-  url?: string;
-  payload?: any;
+const DEFAULT: Config = {
+  startTime: '06:00',
+  endTime: '00:00',
+  webhookUrl: 'https://reportes-cierres.psi.vercel.app/api/webhooks/whatsapp',
+  instanceName: 'mi_bot',
+  numeroReceptor: '',
 };
 
 export default function ConfiguracionPage() {
-  const [captureWindow, setCaptureWindow] = useState<CaptureWindow>(DEFAULT_CAPTURE_WINDOW);
-  const [instanceName, setInstanceName] = useState('reportes-cierres');
-  const [webhookUrl, setWebhookUrl] = useState('http://localhost:3000/api/webhooks/whatsapp');
-  const [connectState, setConnectState] = useState<ConnectResult | null>(null);
-  const [connecting, setConnecting] = useState(false);
-  const [checking, setChecking] = useState(false);
+  const [cfg, setCfg]       = useState<Config>(DEFAULT);
+  const [saved, setSaved]   = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('capture-window');
-    if (saved) {
-      try {
-        setCaptureWindow({ ...DEFAULT_CAPTURE_WINDOW, ...JSON.parse(saved) });
-      } catch {
-        setCaptureWindow(DEFAULT_CAPTURE_WINDOW);
-      }
-    }
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(json => {
+        if (json.ok && json.data) setCfg({ ...DEFAULT, ...json.data });
+      })
+      .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    window.localStorage.setItem('capture-window', JSON.stringify(captureWindow));
-  }, [captureWindow]);
-
-  const checkEvolution = async () => {
-    setChecking(true);
-    setConnectState(null);
-
+  const save = async () => {
     try {
-      const res = await fetch(`/api/evolution/status?instanceName=${encodeURIComponent(instanceName)}`);
-      const data = await res.json();
-      setConnectState(data);
-    } catch (error: any) {
-      setConnectState({ ok: false, reason: error?.message || 'No se pudo verificar Evolution.' });
-    } finally {
-      setChecking(false);
-    }
-  };
-
-  const connectEvolution = async () => {
-    setConnecting(true);
-    setConnectState(null);
-
-    try {
-      const res = await fetch('/api/evolution/connect', {
+      await fetch('/api/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          instanceName,
-          webhook: webhookUrl,
-        }),
+        body: JSON.stringify(cfg),
       });
-
-      const data = await res.json();
-      setConnectState(data);
-    } catch (error: any) {
-      setConnectState({ ok: false, reason: error?.message || 'Error intentando crear la instancia de Evolution.' });
-    } finally {
-      setConnecting(false);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch {
+      alert('Error guardando configuración');
     }
   };
 
+  const copyWebhook = async () => {
+    await navigator.clipboard.writeText(cfg.webhookUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const set = (key: keyof Config) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setCfg(prev => ({ ...prev, [key]: e.target.value }));
+
   return (
-    <main className="shell">
-      <div className="panel">
-        <div className="header-row">
-          <div>
-            <p className="eyebrow">WhatsApp</p>
-            <h1>Configuración real de Evolution</h1>
-          </div>
-
-          <div className="header-actions">
-            <Link href="/" className="ghost-link">Inicio</Link>
-            <Link href="/dashboard" className="primary-link">Ver pagos</Link>
-          </div>
-        </div>
-
-        <div className="layout">
-          <section className="card qr-card">
-            <div className="qr-block" aria-label="QR de conexión">
-              <div className="qr-frame">
-                {Array.from({ length: 25 }, (_, i) => (
-                  <span key={i} className={`qr-cell ${i % 2 === 0 ? 'dark' : 'light'}`} />
-                ))}
-              </div>
-            </div>
-
-            <div className="field-group">
-              <label htmlFor="instance-name">Nombre de la instancia</label>
-              <input
-                id="instance-name"
-                value={instanceName}
-                onChange={(event) => setInstanceName(event.target.value)}
-              />
-            </div>
-
-            <div className="field-group">
-              <label htmlFor="webhook-url">Webhook</label>
-              <input
-                id="webhook-url"
-                value={webhookUrl}
-                onChange={(event) => setWebhookUrl(event.target.value)}
-              />
-            </div>
-
-            <div className="field-row">
-              <button type="button" className="primary-button" onClick={connectEvolution} disabled={connecting}>
-                {connecting ? 'Conectando...' : 'Conectar a Evolution'}
-              </button>
-              <button type="button" className="secondary-button" onClick={checkEvolution} disabled={checking}>
-                {checking ? 'Verificando...' : 'Verificar estado'}
-              </button>
-            </div>
-
-            {connectState && (
-              <div className={`result-box ${connectState.ok ? 'success' : 'error'}`}>
-                <strong>{connectState.ok ? 'Conexión correcta' : 'Error de conexión'}</strong>
-                <p>
-                  {connectState.reason || connectState.status || 'Sin detalle'}
-                </p>
-              </div>
-            )}
-          </section>
-
-          <section className="card settings-card">
-            <div className="card-header">
-              <p className="eyebrow subtle">Production config</p>
-              <h2>Parámetros activos</h2>
-            </div>
-
-            <div className="field-group">
-              <label htmlFor="api-url">URL de Evolution</label>
-              <input id="api-url" value={process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'} readOnly />
-            </div>
-
-            <div className="field-group">
-              <label htmlFor="server-url">Servidor</label>
-              <input id="server-url" value={process.env.SERVER_URL || 'http://144.126.129.154:8081'} readOnly />
-            </div>
-
-            <div className="field-group">
-              <label htmlFor="start-time">Horario de captura</label>
-              <div className="time-grid">
-                <input
-                  id="start-time"
-                  type="time"
-                  value={captureWindow.startTime}
-                  onChange={(event) =>
-                    setCaptureWindow((current) => ({ ...current, startTime: event.target.value }))
-                  }
-                />
-                <input
-                  id="end-time"
-                  type="time"
-                  value={captureWindow.endTime}
-                  onChange={(event) =>
-                    setCaptureWindow((current) => ({ ...current, endTime: event.target.value }))
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="status-box">
-              <span className="status-pill">Conexión real activa</span>
-              <p>La aplicación usa valores del entorno para conectarse a Evolution y al webhook real. Si la instancia aún no existe, el botón de conectar la crea.</p>
-            </div>
-          </section>
-        </div>
+    <div className="animate-fade-in">
+      <div style={{ marginBottom: '28px' }}>
+        <p className="eyebrow" style={{ marginBottom: '4px' }}>Sistema</p>
+        <h1 className="page-title">Configuración</h1>
+        <p className="page-subtitle">Ajustes de captura, webhook y conexión</p>
       </div>
 
-      <style jsx>{`
-        :global(body) {
-          margin: 0;
-          font-family: Inter, 'Segoe UI', sans-serif;
-          background: linear-gradient(135deg, #f8fafc 0%, #eef7ff 100%);
-          color: #0f172a;
-        }
+      <div style={{ display: 'grid', gap: '20px', maxWidth: '720px' }}>
 
-        * { box-sizing: border-box; }
+        {/* Capture window */}
+        <div className="card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+            <div style={iconWrap}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+            </div>
+            <div>
+              <p style={cardTitle}>Ventana de captura</p>
+              <p style={cardSub}>Solo se procesan mensajes dentro de este rango horario</p>
+            </div>
+          </div>
 
-        .shell {
-          min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 32px 20px;
-        }
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div>
+              <p className="label" style={{ marginBottom: '8px' }}>Hora inicio</p>
+              <input id="cfg-start" type="time" className="input" value={cfg.startTime} onChange={set('startTime')} />
+            </div>
+            <div>
+              <p className="label" style={{ marginBottom: '8px' }}>Hora fin</p>
+              <input id="cfg-end" type="time" className="input" value={cfg.endTime} onChange={set('endTime')} />
+              <p style={{ fontSize: '11px', color: '#2d3748', marginTop: '6px' }}>00:00 = medianoche (fin del día)</p>
+            </div>
+          </div>
 
-        .panel {
-          width: min(1100px, 100%);
-          background: rgba(255,255,255,0.85);
-          border: 1px solid rgba(148,163,184,0.2);
-          border-radius: 28px;
-          box-shadow: 0 24px 80px rgba(15, 23, 42, 0.06);
-          padding: 28px;
-          backdrop-filter: blur(10px);
-        }
+          <div style={{ marginTop: '16px', padding: '12px 14px', background: 'rgba(99,102,241,0.06)', borderRadius: '10px', border: '1px solid rgba(99,102,241,0.12)' }}>
+            <p style={{ fontSize: '12px', color: '#818cf8', fontWeight: '600' }}>
+              Rango activo: {cfg.startTime} → {cfg.endTime === '00:00' ? '24:00 (medianoche)' : cfg.endTime}
+            </p>
+          </div>
+        </div>
 
-        .header-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 16px;
-          margin-bottom: 24px;
-        }
+        {/* Webhook */}
+        <div className="card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+            <div style={iconWrap}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+              </svg>
+            </div>
+            <div>
+              <p style={cardTitle}>Webhook de Evolution API</p>
+              <p style={cardSub}>URL donde Evolution enviará los mensajes de WhatsApp</p>
+            </div>
+          </div>
 
-        .header-actions {
-          display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
-        }
+          <div>
+            <p className="label" style={{ marginBottom: '8px' }}>URL del Webhook</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <input id="cfg-webhook" type="url" className="input" value={cfg.webhookUrl} onChange={set('webhookUrl')} style={{ flex: 1, fontFamily: 'monospace', fontSize: '12px' }} />
+              <button id="cfg-copy-webhook" className="btn btn-ghost" style={{ whiteSpace: 'nowrap', flexShrink: 0 }} onClick={copyWebhook}>
+                {copied ? '✓ Copiado' : '📋 Copiar'}
+              </button>
+            </div>
+          </div>
 
-        .eyebrow {
-          margin: 0 0 8px;
-          text-transform: uppercase;
-          letter-spacing: 0.12em;
-          font-size: 11px;
-          font-weight: 700;
-          color: #2563eb;
-        }
+          <div className="alert alert-warning" style={{ marginTop: '16px' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <div>
+              <p style={{ fontWeight: '700', marginBottom: '4px', fontSize: '12px' }}>Configurar en Evolution API (VPS)</p>
+              <p style={{ fontSize: '11px', opacity: 0.85 }}>Ejecuta este comando en el VPS para registrar el webhook:</p>
+              <code style={{ display: 'block', marginTop: '6px', background: 'rgba(0,0,0,0.25)', padding: '6px 10px', borderRadius: '5px', fontSize: '11px', color: '#fde68a', wordBreak: 'break-all' }}>
+                {`curl -X POST http://localhost:8081/webhook/set/mi_bot \\
+  -H "apikey: 9f4b61d9-1e2a-4b9d-8a6a-5f8dd6f7f5c1" \\
+  -H "Content-Type: application/json" \\
+  -d '{"url":"${cfg.webhookUrl}","enabled":true,"events":["MESSAGES_UPSERT"]}'`}
+              </code>
+            </div>
+          </div>
+        </div>
 
-        .eyebrow.subtle {
-          color: #64748b;
-        }
+        {/* Instance */}
+        <div className="card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+            <div style={iconWrap}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+            </div>
+            <div>
+              <p style={cardTitle}>Instancia WhatsApp</p>
+              <p style={cardSub}>Nombre de la instancia en Evolution API</p>
+            </div>
+          </div>
 
-        h1, h2 {
-          margin: 0;
-          letter-spacing: -0.04em;
-        }
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div>
+              <p className="label" style={{ marginBottom: '8px' }}>Nombre de instancia</p>
+              <input id="cfg-instance" type="text" className="input" value={cfg.instanceName} onChange={set('instanceName')} placeholder="mi_bot" />
+            </div>
+            <div>
+              <p className="label" style={{ marginBottom: '8px' }}>Número WhatsApp Receptor</p>
+              <input id="cfg-receptor" type="text" className="input" value={cfg.numeroReceptor} onChange={set('numeroReceptor')} placeholder="Ej. 584141234567" />
+              <p style={{ fontSize: '11px', color: '#2d3748', marginTop: '6px' }}>Número que recibe los captures (con código de país)</p>
+            </div>
+          </div>
 
-        h1 {
-          font-size: clamp(2rem, 3vw, 2.6rem);
-        }
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '16px' }}>
+            <InfoBox label="Estado Redis" value="⚠️ Desconectado" color="#fbbf24" />
+            <InfoBox label="Evolution API" value="✓ Activo :8081" color="#34d399" />
+            <InfoBox label="VPS IP" value="144.126.129.154" color="#94a3b8" />
+            <InfoBox label="Versión" value="v2.3.7" color="#94a3b8" />
+          </div>
+        </div>
 
-        h2 {
-          font-size: clamp(1.3rem, 2vw, 1.8rem);
-        }
-
-        .layout {
-          display: grid;
-          grid-template-columns: 1.1fr 1fr;
-          gap: 22px;
-        }
-
-        .card {
-          background: #fff;
-          border: 1px solid rgba(148,163,184,0.2);
-          border-radius: 22px;
-          padding: 22px;
-        }
-
-        .qr-block {
-          display: flex;
-          justify-content: center;
-          margin-bottom: 22px;
-        }
-
-        .qr-frame {
-          width: min(240px, 100%);
-          display: grid;
-          grid-template-columns: repeat(5, 1fr);
-          gap: 6px;
-          padding: 16px;
-          background: #f8fafc;
-          border: 1px solid rgba(148,163,184,0.2);
-          border-radius: 18px;
-        }
-
-        .qr-cell {
-          width: 100%;
-          aspect-ratio: 1;
-          border-radius: 4px;
-        }
-
-        .qr-cell.dark { background: #0f172a; }
-        .qr-cell.light { background: rgba(148,163,184,0.18); }
-
-        .field-group {
-          margin-bottom: 16px;
-        }
-
-        label {
-          display: block;
-          font-size: 0.72rem;
-          font-weight: 700;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-          color: #475569;
-          margin-bottom: 8px;
-        }
-
-        input {
-          width: 100%;
-          border: 1px solid rgba(148,163,184,0.35);
-          border-radius: 12px;
-          background: #f8fafc;
-          padding: 12px 14px;
-          font-size: 1rem;
-          color: #0f172a;
-        }
-
-        .time-grid {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(120px, 1fr));
-          gap: 10px;
-        }
-
-        .field-row {
-          display: flex;
-          gap: 12px;
-          flex-wrap: wrap;
-          margin-top: 18px;
-        }
-
-        .primary-button,
-        .secondary-button,
-        .ghost-link,
-        .primary-link {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 12px;
-          text-decoration: none;
-          font-weight: 700;
-          padding: 12px 16px;
-          transition: transform 0.15s ease;
-          cursor: pointer;
-        }
-
-        .primary-button,
-        .primary-link {
-          background: linear-gradient(135deg, #3b82f6, #2563eb);
-          color: white;
-          border: none;
-        }
-
-        .secondary-button {
-          background: white;
-          color: #0f172a;
-          border: 1px solid rgba(148,163,184,0.5);
-        }
-
-        .ghost-link {
-          background: #f1f5f9;
-          color: #0f172a;
-          border: 1px solid rgba(148,163,184,0.3);
-        }
-
-        .status-box {
-          margin-top: 18px;
-          background: #f0fdf4;
-          border: 1px solid #bbf7d0;
-          border-radius: 14px;
-          padding: 16px;
-        }
-
-        .status-pill {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 999px;
-          background: #dcfce7;
-          color: #166534;
-          padding: 7px 10px;
-          font-size: 11px;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-        }
-
-        .status-box p {
-          margin: 12px 0 0;
-          color: #36525c;
-          line-height: 1.6;
-        }
-
-        .result-box {
-          margin-top: 18px;
-          border-radius: 12px;
-          padding: 14px 16px;
-          border: 1px solid transparent;
-        }
-
-        .result-box.success {
-          background: #ecfdf5;
-          border-color: #a7f3d0;
-          color: #166534;
-        }
-
-        .result-box.error {
-          background: #fef2f2;
-          border-color: #fecaca;
-          color: #991b1b;
-        }
-
-        .result-box strong {
-          display: block;
-          margin-bottom: 6px;
-        }
-
-        .result-box p {
-          margin: 0;
-          line-height: 1.5;
-        }
-
-        @media (max-width: 760px) {
-          .layout {
-            grid-template-columns: 1fr;
-          }
-
-          .header-row {
-            flex-direction: column;
-            align-items: flex-start;
-          }
-        }
-      `}</style>
-    </main>
+        {/* Save */}
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button id="cfg-save" className="btn btn-primary" onClick={save} style={{ flex: 1, height: '44px' }}>
+            {saved ? '✓ Guardado' : 'Guardar configuración'}
+          </button>
+          <button className="btn btn-ghost" onClick={() => setCfg(DEFAULT)}>
+            Restaurar
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
+
+function InfoBox({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div style={{ background: 'rgba(148,163,184,0.04)', border: '1px solid rgba(148,163,184,0.08)', borderRadius: '10px', padding: '10px 14px' }}>
+      <p style={{ fontSize: '10px', color: '#2d3748', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>{label}</p>
+      <p style={{ fontSize: '12px', color, fontWeight: '600' }}>{value}</p>
+    </div>
+  );
+}
+
+const iconWrap: React.CSSProperties = {
+  width: '36px',
+  height: '36px',
+  borderRadius: '10px',
+  background: 'rgba(99,102,241,0.1)',
+  border: '1px solid rgba(99,102,241,0.15)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+};
+const cardTitle: React.CSSProperties = { fontSize: '14px', fontWeight: '700', color: '#e8edf5' };
+const cardSub: React.CSSProperties   = { fontSize: '12px', color: '#2d3748', marginTop: '2px' };

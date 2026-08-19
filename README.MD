@@ -2,15 +2,22 @@
 
 Este repositorio queda como base de infraestructura para desplegar localmente un entorno con Evolution API + PostgreSQL y dejar preparado el acceso a Supabase para la aplicación web de cierres de caja.
 
-## Estado actual
+## Estado del Proyecto y Progreso (Log)
 
-Se han dejado preparados:
+**✅ Lo que está completado:**
+- **Infraestructura de Evolution API**: Configuración de Docker (Postgres, Redis, Evolution API v2.1.1) rediseñada, funcional y estable en la VPS.
+- **Migración a App Router**: Se estructuró el código de Next.js en la carpeta `app/` de forma definitiva.
+- **Autenticación (Supabase)**: Rutas `/api/auth/login`, protección con `middleware.ts` y UI de login completadas.
+- **Dashboard y Conexión WA**: Interfaz en tiempo real conectada al estado de Evolution API (`/api/evolution/status`) y vista de base de datos de pagos (`/api/pagos`). Generación de código QR y monitoreo de instancia activos.
 
-- la configuración de Docker para Evolution API
-- la plantilla de variables de entorno del proyecto
-- la guía de despliegue local y de conexión con Supabase
+**🚧 Lo que falta del plan (Siguientes pasos):**
+- **Webhook de WhatsApp**: Desarrollar la ruta (ej. `app/api/webhooks/whatsapp/route.ts`) para recibir eventos de mensajes de Evolution API.
+- **Integración con Gemini (OCR)**: Lógica dentro del webhook para interpretar imágenes de los comprobantes y extraer información (monto, referencia, banco).
+- **Sincronización con PSKloud**: Inserción de los pagos aprobados en la base de datos de facturación.
 
-Falta el frontend real de la app (Next.js) si quieres mantenerlo en este mismo repositorio, pero la parte infraestructura ya está lista para arrancar.
+**🛠 Problemas resueltos recientemente:**
+- **Conflicto de Contenedores en VPS**: Limpieza de contenedores huérfanos de `evolution_api` que bloqueaban el arranque del stack.
+- **Rediseño del docker-compose.yml**: Se integró explícitamente `redis` y se añadieron `healthchecks` tanto a Postgres como a Redis. Esto evita que Evolution API arranque a destiempo, solucionando definitivamente los errores de "Redis desconectado" y "fetch failed" que rompían la UI del frontend.
 
 ## Arquitectura recomendada
 
@@ -88,12 +95,45 @@ Para dejarlo completamente operativo, el siguiente bloque a construir es la app 
 - OCR con Gemini
 - sincronización con PSKloud
 
+## Ruta real confirmada dentro del VPS
+
+La ruta correcta que quedó confirmada en el servidor es:
+
+```bash
+/opt/evolution
+```
+
+Dentro de esa carpeta se encuentran los archivos reales:
+
+```bash
+ls -la /opt/evolution
+find /opt/evolution -maxdepth 3 \( -name "vps-evolution-compose.yml" -o -name "docker-compose.yml" -o -name ".env" \) 2>/dev/null
+```
+
+Salida esperada:
+
+```bash
+/opt/evolution/.env
+/opt/evolution/docker-compose.yml
+```
+
+En ese directorio se ejecutan los comandos de levantamiento del stack de Evolution.
+
+```bash
+cd /opt/evolution
+ls -la
+cat .env
+cat docker-compose.yml
+```
+
 ## Comandos útiles
 
 ```bash
-docker compose ps
-docker compose logs -f evolution-api
-docker compose down
+docker compose -f vps-evolution-compose.yml --env-file .env config
+docker compose -f vps-evolution-compose.yml --env-file .env up -d --force-recreate --remove-orphans
+docker compose -f vps-evolution-compose.yml --env-file .env ps
+docker compose -f vps-evolution-compose.yml --env-file .env logs -f evolution-api --tail=200
+docker compose -f vps-evolution-compose.yml --env-file .env down
 ```
 
 ## Nota importante
