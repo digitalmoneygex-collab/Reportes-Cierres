@@ -31,6 +31,7 @@ export async function GET(request: Request) {
     let query = supabaseAdmin
       .from('pagos_whatsapp')
       .select('*')
+      .eq('es_duplicado', false)
       .gte('created_at', start.toISOString())
       .lte('created_at', end.toISOString())
       .order('created_at', { ascending: false })

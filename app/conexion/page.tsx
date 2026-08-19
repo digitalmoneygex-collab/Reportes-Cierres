@@ -22,6 +22,8 @@ type QrData = {
   error?: string;
 };
 
+type SyncResult = { procesados: number; duplicados: number; errores: number; total: number } | null;
+
 export default function ConexionPage() {
   const [instance, setInstance] = useState<WaInstance | null>(null);
   const [qrData, setQrData]     = useState<QrData | null>(null);
@@ -29,6 +31,8 @@ export default function ConexionPage() {
   const [qrLoading, setQrLoad]  = useState(false);
   const [apiError, setApiError] = useState('');
   const [lastCheck, setLastCheck] = useState('');
+  const [syncing, setSyncing]   = useState(false);
+  const [syncResult, setSyncResult] = useState<SyncResult>(null);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -59,6 +63,21 @@ export default function ConexionPage() {
       setQrData({ ok: false, error: e instanceof Error ? e.message : 'Error' });
     } finally {
       setQrLoad(false);
+    }
+  }, []);
+
+  const runSync = useCallback(async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res  = await fetch('/api/evolution/sync', { method: 'POST', cache: 'no-store' });
+      const data = await res.json();
+      if (data.ok) setSyncResult(data.resumen);
+      else setApiError(data.error ?? 'Error en sincronización');
+    } catch (e: unknown) {
+      setApiError(e instanceof Error ? e.message : 'Error de red');
+    } finally {
+      setSyncing(false);
     }
   }, []);
 
@@ -176,14 +195,29 @@ export default function ConexionPage() {
           </p>
 
           {connected ? (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '32px 0' }}>
-              <div style={{ fontSize: '72px', marginBottom: '16px' }}>✅</div>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '24px 0', gap: '12px' }}>
+              <div style={{ fontSize: '64px' }}>✅</div>
               <p style={{ fontSize: '20px', fontWeight: '800', color: '#34d399' }}>Conectado</p>
-              <p style={{ fontSize: '13px', color: '#475569', marginTop: '8px' }}>
-                {instance?.profileName ?? 'WhatsApp activo'}
-              </p>
+              <p style={{ fontSize: '13px', color: '#475569' }}>{instance?.profileName ?? 'WhatsApp activo'}</p>
               {instance?.number && (
-                <p style={{ fontSize: '13px', color: '#818cf8', marginTop: '4px', fontFamily: 'monospace' }}>{instance.number}</p>
+                <p style={{ fontSize: '13px', color: '#818cf8', fontFamily: 'monospace' }}>{instance.number}</p>
+              )}
+              <button
+                id="conexion-sync"
+                onClick={runSync}
+                disabled={syncing}
+                className="btn btn-primary"
+                style={{ marginTop: '8px', width: '100%', opacity: syncing ? 0.7 : 1 }}
+              >
+                {syncing ? '⏳ Sincronizando…' : '🔍 Sincronizar mensajes del día'}
+              </button>
+              {syncResult && (
+                <div style={{ width: '100%', padding: '10px 14px', background: 'rgba(52,211,153,0.07)', border: '1px solid rgba(52,211,153,0.15)', borderRadius: '10px', textAlign: 'left' }}>
+                  <p style={{ fontSize: '12px', fontWeight: '700', color: '#34d399', marginBottom: '6px' }}>✅ Sincronización completa</p>
+                  <p style={{ fontSize: '11px', color: '#94a3b8' }}>✔ Procesados: <strong style={{color:'#e8edf5'}}>{syncResult.procesados}</strong></p>
+                  <p style={{ fontSize: '11px', color: '#94a3b8' }}>⚠ Duplicados: <strong style={{color:'#fbbf24'}}>{syncResult.duplicados}</strong></p>
+                  <p style={{ fontSize: '11px', color: '#94a3b8' }}>✖ Errores: <strong style={{color:'#f87171'}}>{syncResult.errores}</strong></p>
+                </div>
               )}
             </div>
           ) : qrLoading ? (
