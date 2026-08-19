@@ -168,7 +168,7 @@ export default function ConfiguracionPage() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '16px' }}>
-            <InfoBox label="Estado Redis" value="⚠️ Desconectado" color="#fbbf24" />
+            <InfoBox label="Estado Redis" value="✅ Conectado" color="#34d399" />
             <InfoBox label="Evolution API" value="✓ Activo :8081" color="#34d399" />
             <InfoBox label="VPS IP" value="144.126.129.154" color="#94a3b8" />
             <InfoBox label="Versión" value="v2.3.7" color="#94a3b8" />
