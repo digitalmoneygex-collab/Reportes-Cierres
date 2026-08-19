@@ -77,6 +77,7 @@ export async function POST(request: Request) {
     let procesados = 0;
     let duplicados = 0;
     let errores    = 0;
+    const errorDetails: string[] = [];
 
     for (const msg of eligible) {
       const messageId = msg.key.id;
@@ -95,15 +96,29 @@ export async function POST(request: Request) {
         headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_KEY },
         body: JSON.stringify({ message: msg })
       });
-      if (!dlRes.ok) { errores++; continue; }
+      if (!dlRes.ok) { 
+        errores++; 
+        errorDetails.push(`Evolution HTTP ${dlRes.status}: ${await dlRes.text()}`);
+        continue; 
+      }
       const dlJson = await dlRes.json();
       const base64 = dlJson.base64 ?? dlJson.data?.base64 ?? '';
-      if (!base64) { errores++; continue; }
+      if (!base64) { 
+        errores++; 
+        errorDetails.push(`No base64 returned by Evolution`);
+        continue; 
+      }
 
       // OCR
       let extractedData;
-      try { extractedData = await readPaymentReceiptImage(base64); }
-      catch { errores++; continue; }
+      try { 
+        extractedData = await readPaymentReceiptImage(base64); 
+      }
+      catch (err: any) { 
+        errores++; 
+        errorDetails.push(`OCR Error: ${err.message}`);
+        continue; 
+      }
 
       const referencia = extractedData.referencia || 'SIN REF';
 
@@ -138,7 +153,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: true,
-      resumen: { total: eligible.length, procesados, duplicados, errores }
+      resumen: { total: eligible.length, procesados, duplicados, errores },
+      errorDetails
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Error desconocido';
