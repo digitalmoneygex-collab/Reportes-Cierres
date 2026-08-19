@@ -1,0 +1,1 @@
+{"event":"messages.upsert","instance":"mi_bot","data":{"key":{"remoteJid":"584245447567@s.whatsapp.net","fromMe":false,"id":"TEST-123"},"messageTimestamp":1750000000,"message":{"conversation":"hola"}}}

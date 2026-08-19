@@ -32,14 +32,13 @@ export async function POST(request: Request) {
 
     if (!cleanReceptor) return NextResponse.json({ ok: false, error: 'Sin número receptor' });
 
-    // 2. Obtener mensajes del chat del receptor (hoy)
-    const remoteJid = `${cleanReceptor}@s.whatsapp.net`;
+    // 2. Obtener mensajes recientes (sin filtro where para no perder los @lid)
     const fetchRes = await fetch(
       `${EVOLUTION_URL}/chat/findMessages/${instanceName}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_KEY },
-        body: JSON.stringify({ where: { key: { remoteJid } } })
+        body: JSON.stringify({ where: {} }) // Trae los últimos mensajes de la instancia
       }
     );
 
@@ -49,18 +48,23 @@ export async function POST(request: Request) {
     }
 
     type EvolutionMsg = {
-      key: { id: string; remoteJid: string; fromMe: boolean };
+      key: { id: string; remoteJid: string; remoteJidAlt?: string; fromMe: boolean };
       message: Record<string, unknown>;
       messageTimestamp: number;
     };
-    const messages: EvolutionMsg[] = await fetchRes.json();
-    if (!Array.isArray(messages)) {
-      return NextResponse.json({ ok: false, error: 'Respuesta inválida de Evolution API' });
+    const responseData = await fetchRes.json();
+    // En Evolution v2.3.7, la respuesta de findMessages sin JID es { messages: { records: [...] } }
+    const messages: EvolutionMsg[] = responseData.messages?.records || responseData.records || responseData || [];
+    
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return NextResponse.json({ ok: false, error: 'Respuesta inválida o vacía de Evolution API' });
     }
 
-    // 3. Filtrar: solo imágenes, dentro del rango horario Venezuela, no enviadas por el bot
+    // 3. Filtrar: solo imágenes, dentro del rango horario Venezuela, no enviadas por el bot y del receptor
     const todayVZ = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Caracas' }); // YYYY-MM-DD
     const eligible = messages.filter(msg => {
+      const jid = (msg.key.remoteJid || '') + (msg.key.remoteJidAlt || '');
+      if (!jid.includes(cleanReceptor)) return false;
       if (msg.key.fromMe) return false;
       if (!msg.message?.imageMessage) return false;
       const rawTs = msg.messageTimestamp;

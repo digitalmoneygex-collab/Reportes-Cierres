@@ -82,6 +82,7 @@ export async function POST(request: Request) {
     // Normalizar el mensaje (puede venir solo o en array)
     const msgItem        = msgData.messages?.[0] ?? msgData;
     const remoteJid      = msgItem.key?.remoteJid  ?? msgData.key?.remoteJid  ?? '';
+    const remoteJidAlt   = msgItem.key?.remoteJidAlt ?? msgData.key?.remoteJidAlt ?? '';
     const isFromMe       = msgItem.key?.fromMe      ?? msgData.key?.fromMe      ?? false;
     const messageId      = msgItem.key?.id          ?? msgData.key?.id          ?? '';
     const instanceName   = payload.instance;
@@ -109,7 +110,9 @@ export async function POST(request: Request) {
 
     // 2. Filtro de intersección Maestro-Esclavo
     const cleanReceptor = receptor.replace(/\D/g, '');
-    if (!remoteJid.includes(cleanReceptor)) {
+    const combinedJid = remoteJid + remoteJidAlt;
+    
+    if (!combinedJid.includes(cleanReceptor)) {
       return NextResponse.json({ ok: true, ignored: 'Fuera de intersección' });
     }
 
@@ -184,7 +187,7 @@ export async function POST(request: Request) {
       // Guardar como duplicado pero no contarlo
       await supabaseAdmin.from('pagos_whatsapp').insert({
         message_id:      messageId || null,
-        telefono_emisor: remoteJid.split('@')[0],
+        telefono_emisor: cleanReceptor, // Almacenar el número limpio del receptor como emisor, o extraer del alt
         monto_bs:        extractedData.monto_bs   || 0,
         referencia,
         banco_origen:    extractedData.banco_origen || 'Desconocido',
@@ -205,7 +208,7 @@ export async function POST(request: Request) {
     // 9. Insertar pago válido
     const { error: dbError } = await supabaseAdmin.from('pagos_whatsapp').insert({
       message_id:      messageId || null,
-      telefono_emisor: remoteJid.split('@')[0],
+      telefono_emisor: cleanReceptor,
       monto_bs:        extractedData.monto_bs   || 0,
       referencia,
       banco_origen:    extractedData.banco_origen || 'Desconocido',
