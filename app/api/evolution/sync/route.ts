@@ -123,7 +123,7 @@ export async function POST(request: Request) {
 
       await supabaseAdmin.from('pagos_whatsapp').insert({
         message_id:      messageId,
-        telefono_emisor: remoteJid.split('@')[0],
+        telefono_emisor: cleanReceptor,
         monto_bs:        extractedData.monto_bs || 0,
         referencia,
         banco_origen:    extractedData.banco_origen || 'Desconocido',
