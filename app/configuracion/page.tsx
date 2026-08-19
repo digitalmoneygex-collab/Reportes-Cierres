@@ -135,7 +135,7 @@ export default function ConfiguracionPage() {
                 {`curl -X POST http://localhost:8081/webhook/set/mi_bot \\
   -H "apikey: 9f4b61d9-1e2a-4b9d-8a6a-5f8dd6f7f5c1" \\
   -H "Content-Type: application/json" \\
-  -d '{"url":"${cfg.webhookUrl}","enabled":true,"events":["MESSAGES_UPSERT"]}'`}
+  -d '{"webhook":{"url":"${cfg.webhookUrl}","enabled":true,"events":["MESSAGES_UPSERT"]}}'`}
               </code>
             </div>
           </div>
