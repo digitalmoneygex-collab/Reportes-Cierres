@@ -10,13 +10,13 @@ export async function GET() {
     const vzDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Caracas' }));
     const today = `${vzDate.getFullYear()}-${String(vzDate.getMonth() + 1).padStart(2, '0')}-${String(vzDate.getDate()).padStart(2, '0')}`;
 
-    const [{ data, error }, tasa] = await Promise.all([
+    const [{ data, error }, tasaResult] = await Promise.all([
       supabaseAdmin
         .from('pskloud_snapshot')
         .select('*')
         .eq('fecha', today)
         .maybeSingle(),
-      getTasaDelDia(),
+      getTasaDelDia().catch(() => 0), // Si falla la tasa, usar 0 sin romper el route
     ]);
 
     if (error) {
@@ -31,6 +31,7 @@ export async function GET() {
       });
     }
 
+    const tasa     = Number(tasaResult ?? 0);
     const totalBs  = Number(data.corte_caja_bs ?? 0);
     const totalUsd = tasa > 0 ? totalBs / tasa : 0;
 
