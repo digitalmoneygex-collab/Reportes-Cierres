@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     const todayVZ = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Caracas' }); // YYYY-MM-DD
     const eligible = messages.filter(msg => {
       const jid = (msg.key.remoteJid || '') + (msg.key.remoteJidAlt || '');
-      if (!jid.includes(cleanReceptor)) return false;
+      // if (!jid.includes(cleanReceptor)) return false;
       if (!msg.message?.imageMessage) return false;
       const rawTs = msg.messageTimestamp;
       const msgDate = new Date(rawTs < 1e12 ? rawTs * 1000 : rawTs);
