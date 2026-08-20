@@ -38,7 +38,7 @@ function qty(rows, fn) {
 
 function esCombo6Pastel(nombre) {
   const u = n(nombre);
-  return u.includes('COMBO') && !u.includes('12') && !u.includes('TEQUE') && !u.includes('REFRESC');
+  return ['COMBO 6 PASTELES MOLIDA', 'COMBO 6 PASTELES PAPAQUESO', 'COMBO 6 PASTELES QUESO', 'COMBO 6 PASTELES VARIADO'].includes(u);
 }
 
 function esCombo12Pastel(nombre) {

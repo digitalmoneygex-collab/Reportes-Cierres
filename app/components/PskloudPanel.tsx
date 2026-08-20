@@ -169,16 +169,21 @@ export default function PskloudPanel({ data, loading }: { data: PskloudData | nu
         <Divider />
         <SectionTitle icon="">Combos ×6 piezas</SectionTitle>
         {[
-          'COMBO 6 PASTELES VARIADO',
-          'PASTELES COMBO CARNE',
-          'PASTELES COMBO PAPAQUESO',
-          'PASTELES COMBO QUESO'
+          'COMBO 6 PASTELES MOLIDA',
+          'COMBO 6 PASTELES PAPAQUESO',
+          'COMBO 6 PASTELES QUESO',
+          'COMBO 6 PASTELES VARIADO'
         ].reduce((acc, defName) => {
           if (!acc.some(c => c.nombre === defName)) {
             acc.push({ nombre: defName, cantidad: 0, piezas: 0 });
           }
           return acc;
-        }, [...pasteles.combos6]).map((c, i) => (
+        }, [...pasteles.combos6].filter(c => [
+          'COMBO 6 PASTELES MOLIDA',
+          'COMBO 6 PASTELES PAPAQUESO',
+          'COMBO 6 PASTELES QUESO',
+          'COMBO 6 PASTELES VARIADO'
+        ].includes(c.nombre))).map((c, i) => (
           <Row 
             key={i} 
             label={c.nombre} 
