@@ -7,9 +7,15 @@ export async function readPaymentReceiptImage(base64Image: string) {
     throw new Error('Falta GEMINI_API_KEY');
   }
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-  const result = await model.generateContent({
+  // Add retry logic for 503 errors
+  let result;
+  let retries = 3;
+  
+  while (retries > 0) {
+    try {
+      result = await model.generateContent({
     contents: [
       {
         role: 'user',
@@ -24,9 +30,22 @@ export async function readPaymentReceiptImage(base64Image: string) {
             },
           },
         ],
-      },
-    ],
-  });
+      });
+      break; // Success, exit loop
+    } catch (error: any) {
+      console.error(`Gemini API Error: ${error.message}`);
+      retries--;
+      if (retries === 0) {
+        throw new Error(`Error en OCR después de 3 intentos: ${error.message}`);
+      }
+      // Wait 2 seconds before retrying
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
+
+  if (!result) {
+    throw new Error('No se pudo obtener respuesta del modelo Gemini.');
+  }
 
   const text = result.response.text();
   return JSON.parse(text.replace(/```json|```/g, '').trim());
