@@ -1,17 +1,23 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { getTasaDelDia } from '@/lib/tasa';
 
 // GET /api/pskloud/resumen
 // Lee el snapshot más reciente subido por sync-pskloud.js local
 export async function GET() {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    // Fecha Venezuela (UTC-4)
+    const vzDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Caracas' }));
+    const today = `${vzDate.getFullYear()}-${String(vzDate.getMonth() + 1).padStart(2, '0')}-${String(vzDate.getDate()).padStart(2, '0')}`;
 
-    const { data, error } = await supabaseAdmin
-      .from('pskloud_snapshot')
-      .select('*')
-      .eq('fecha', today)
-      .maybeSingle();
+    const [{ data, error }, tasa] = await Promise.all([
+      supabaseAdmin
+        .from('pskloud_snapshot')
+        .select('*')
+        .eq('fecha', today)
+        .maybeSingle(),
+      getTasaDelDia(),
+    ]);
 
     if (error) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
@@ -25,13 +31,16 @@ export async function GET() {
       });
     }
 
+    const totalBs  = Number(data.corte_caja_bs ?? 0);
+    const totalUsd = tasa > 0 ? totalBs / tasa : 0;
+
     return NextResponse.json({
       ok: true,
       synced_at: data.synced_at,
       corteCaja: {
-        totalBs: data.corte_caja_bs,
-        tasa: 0, // se completará en el front con la tasa del día
-        totalUsd: 0,
+        totalBs,
+        tasa,
+        totalUsd,
       },
       burguer:    data.burguer,
       pasteles:   data.pasteles,
