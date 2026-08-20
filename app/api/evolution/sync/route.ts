@@ -39,7 +39,7 @@ export async function POST(request: Request) {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_KEY },
-        body: JSON.stringify({ where: {} }) // Trae los últimos mensajes de la instancia
+        body: JSON.stringify({ where: {}, limit: 1000, take: 1000 }) // Trae más mensajes para no perder los del principio del día
       }
     );
 
