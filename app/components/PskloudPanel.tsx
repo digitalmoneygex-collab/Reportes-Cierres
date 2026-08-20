@@ -4,35 +4,33 @@ const fmtBs = (v: number) =>
   new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'VES', maximumFractionDigits: 2 }).format(v ?? 0);
 
 // ─── Types ────────────────────────────────────────────────
-type ComboItem = { nombre: string; cantidad: number; piezas: number; talla?: number };
+type ComboItem = { nombre: string; cantidad: number; piezas?: number; talla?: number };
 type RepoItem  = { nombre: string; cantidad: number };
 
 interface PskloudData {
   ok: boolean;
   corteCaja: { totalBs: number; totalUsd: number; tasa: number };
   burguer: {
-    hambPollo: number | null; hambCarne: number | null; hambMixta: number | null;
-    totalHambSueltas: number; combosBurger: ComboItem[];
-    totalPiezasComboBurger: number; totalPanesHamb: number;
-    perroSuelto: number | null; combosPerro: ComboItem[];
-    totalPanesPerro: number; patacon: number | null;
+    combosHamb: ComboItem[];
+    hambSueltas: ComboItem[];
+    perros: ComboItem[];
+    otros: ComboItem[];
+    totalesInsumos: Record<string, number>;
   };
   pasteles: {
-    sueltos: { molida: number|null; papaqueso: number|null; pizza: number|null; queso: number|null; empanada: number|null };
-    totalSueltos: number; combos6: ComboItem[]; totalCombos6Piezas: number;
-    combos12: ComboItem[]; totalCombos12Piezas: number; totalPiezas: number;
-  };
-  tequeños: {
-    sueltos: number | null; combos6: ComboItem[]; totalCombos6Piezas: number;
-    combos12: ComboItem[]; totalCombos12Piezas: number;
-    pasapalos: { cantidad: number; piezas: number } | null; totalPiezas: number;
+    pasapalos: ComboItem[];
+    pequenos: ComboItem[];
+    empanadas: ComboItem[];
+    grandes: ComboItem[];
+    otros: ComboItem[];
+    totalesInsumos: Record<string, number>;
   };
   reposteria: { items: RepoItem[]; total: number };
 }
 
 // ─── Sub-components ───────────────────────────────────────
 function SVal({ v, suffix = '' }: { v: number | null; suffix?: string }) {
-  if (v === null || v === 0) return (
+  if (v === null || v === 0 || isNaN(v)) return (
     <span style={{ color: '#2d3748', fontStyle: 'italic', fontSize: '11px' }}>sin ventas</span>
   );
   return <span>{v}{suffix}</span>;
@@ -70,6 +68,38 @@ function Divider() {
   return <div style={{ borderBottom: '1px dashed rgba(148,163,184,0.08)', margin: '8px 0' }} />;
 }
 
+// Helper to render lists
+function renderList(title: string, items: ComboItem[], color: string, subtotalLabel: string) {
+  if (!items || items.length === 0) return null;
+  const subtotal = items.reduce((sum, item) => sum + (item.cantidad || 0), 0);
+  
+  return (
+    <>
+      <SectionTitle icon="">{title}</SectionTitle>
+      {items.map((item, i) => {
+        // Find if there's a multiplier in the name like "COMBO 10" or "6 PASTELES"
+        // This is purely visual for the layout requested
+        let displayValue = <SVal v={item.cantidad} />;
+        if (item.cantidad > 0) {
+           let match = item.nombre.match(/(\d+)/);
+           let mult = match ? parseInt(match[1]) : 1;
+           if (item.nombre.includes("25UND")) mult = 25;
+           if (item.nombre.includes("50UND") || item.nombre.includes("X50")) mult = 50;
+           if (item.nombre.includes("12")) mult = 12;
+           if (item.nombre.includes("6 PASTELES") || item.nombre.includes("6 TEQUEÑOS")) mult = 6;
+           
+           if (mult > 1 && item.nombre.includes("COMBO") || item.nombre.includes("PASAPALOS") || item.nombre.includes("12")) {
+              displayValue = <>{item.cantidad} × {mult} = {item.cantidad * mult}</>;
+           }
+        }
+        return <Row key={i} label={item.nombre} value={displayValue} color={color} />;
+      })}
+      <Row label={subtotalLabel} value={subtotal > 0 ? subtotal : <SVal v={0} />} color={color} isTotal />
+      <Divider />
+    </>
+  );
+}
+
 // ─── Main Panel ───────────────────────────────────────────
 export default function PskloudPanel({ data, loading }: { data: PskloudData | null; loading: boolean }) {
   if (loading) {
@@ -86,17 +116,19 @@ export default function PskloudPanel({ data, loading }: { data: PskloudData | nu
     );
   }
 
-  if (!data || !data.ok) {
+  if (!data || !data.ok || !data.burguer || !data.pasteles) {
     return (
       <div className="card" style={{ textAlign: 'center', padding: '32px', color: '#475569' }}>
         <div style={{ fontSize: '28px', marginBottom: '8px' }}>⚠️</div>
-        <p style={{ fontWeight: '600' }}>Sin conexión a PSKLOUD</p>
-        <p style={{ fontSize: '12px', marginTop: '4px', color: '#2d3748' }}>Verifica que el servidor MySQL esté activo</p>
+        <p style={{ fontWeight: '600' }}>Sin conexión a PSKLOUD o Formato Incorrecto</p>
+        <p style={{ fontSize: '12px', marginTop: '4px', color: '#2d3748' }}>Verifica que el script sync-pskloud.js se haya actualizado y ejecutado.</p>
       </div>
     );
   }
 
-  const { corteCaja, burguer, pasteles, tequeños, reposteria } = data;
+  const { corteCaja, burguer, pasteles, reposteria } = data;
+
+  const burguerInsumosKeys = ["PAN BURGUER", "PAN PERRO", "SALCHICHA", "CARNE H", "POLLO", "CARNE M", "TAPA P", "AREPA C", "HUEVO", "BEBIDA", "PAPAS FRITAS 150GR"];
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
@@ -105,127 +137,64 @@ export default function PskloudPanel({ data, loading }: { data: PskloudData | nu
       <div className="card" style={{ background: 'linear-gradient(135deg, #0c1428 0%, #0d1830 100%)', border: '1px solid rgba(99,102,241,0.22)', boxShadow: '0 0 32px rgba(99,102,241,0.07)' }}>
         <SectionTitle icon="🏪">Ventas Sistema</SectionTitle>
         <p style={{ fontSize: '28px', fontWeight: '900', color: '#818cf8', letterSpacing: '-0.05em', lineHeight: 1.1, marginBottom: '4px' }}>
-          {fmtBs(corteCaja.totalBs)}
+          {fmtBs(corteCaja?.totalBs)}
         </p>
-        {corteCaja.tasa > 0 && (
+        {corteCaja?.tasa > 0 && (
           <p style={{ fontSize: '13px', color: '#34d399', fontWeight: '700', marginBottom: '12px' }}>
             ≈ $ {corteCaja.totalUsd.toFixed(2)} USD
           </p>
         )}
         <Divider />
-        <Row label="Tasa BCV" value={`Bs. ${corteCaja.tasa.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} color="#fbbf24" bold />
+        <Row label="Tasa BCV" value={`Bs. ${corteCaja?.tasa?.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || 0}`} color="#fbbf24" bold />
         <Row label="Fuente" value="Corte de Caja" color="#2d3748" />
       </div>
 
       {/* ── Burguer ── */}
       <div className="card">
         <SectionTitle icon="🍔">Burguer</SectionTitle>
-
-        <SectionTitle icon="">Hamburguesas</SectionTitle>
-        <Row label="H. Pollo"    value={<SVal v={burguer.hambPollo} />}  color="#fbbf24" />
-        <Row label="H. Carne"   value={<SVal v={burguer.hambCarne} />}  color="#fbbf24" />
-        <Row label="H. Mixta"   value={<SVal v={burguer.hambMixta} />}  color="#fbbf24" />
-        {burguer.combosBurger.length > 0 && (
-          <>
-            <Divider />
-            <SectionTitle icon="">Combos Hamburguesa</SectionTitle>
-            {burguer.combosBurger.map((c, i) => (
-              <Row key={i} label={c.nombre} value={`${c.cantidad} u × ${c.talla} = ${c.piezas}`} color="#f59e0b" />
-            ))}
-          </>
-        )}
-        <Row label="Total hamburguesas" value={burguer.totalHambSueltas + burguer.totalPiezasComboBurger || <SVal v={null} />} color="#fbbf24" isTotal bold />
-        <Row label="🍞 Panes hamburguesa" value={burguer.totalPanesHamb || <SVal v={null} />} color="#f59e0b" bold />
-
         <Divider />
-        <SectionTitle icon="">Perros Calientes</SectionTitle>
-        <Row label="Perro Caliente" value={<SVal v={burguer.perroSuelto} />} color="#fb923c" />
-        {burguer.combosPerro.map((c, i) => (
-          <Row key={i} label={c.nombre} value={`${c.cantidad} u × ${c.talla} = ${c.piezas}`} color="#fb923c" />
-        ))}
-        <Row label="🍞 Panes perro" value={burguer.totalPanesPerro || <SVal v={null} />} color="#fb923c" isTotal bold />
+        
+        {renderList("Combos Hamburguesa", burguer.combosHamb, "#f59e0b", "SUBTOTAL (Hamburguesas de carne en combo)")}
+        {renderList("Hamburguesas por unidad", burguer.hambSueltas, "#fbbf24", "SUBTOTAL (Hamburguesas por unidad)")}
+        {renderList("Perros Calientes", burguer.perros, "#fb923c", "SUBTOTAL (Perro Caliente)")}
+        {renderList("Otros", burguer.otros, "#a78bfa", "SUBTOTAL (Otros)")}
 
-        {burguer.patacon !== null && burguer.patacon > 0 && (
-          <>
-            <Divider />
-            <Row label="🫓 Patacón" value={burguer.patacon} color="#a78bfa" bold />
-          </>
-        )}
+        <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(245, 158, 11, 0.05)', borderRadius: '8px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+          <SectionTitle icon="📊">TOTALES INSUMOS BURGUER</SectionTitle>
+          {burguerInsumosKeys.map(k => {
+             // Find matching key case insensitive
+             const matchKey = Object.keys(burguer.totalesInsumos || {}).find(tk => tk.toUpperCase() === k);
+             const val = matchKey ? burguer.totalesInsumos[matchKey] : 0;
+             return <Row key={k} label={k} value={<SVal v={val} />} color="#fcd34d" bold={val > 0} />;
+          })}
+        </div>
       </div>
 
-      {/* ── Pasteles & Tequeños ── */}
+      {/* ── Pasteles ── */}
       <div className="card">
-        <SectionTitle icon="🥐">Pasteles</SectionTitle>
-
-        <Row label="Molida"    value={<SVal v={pasteles.sueltos.molida} />}    color="#34d399" />
-        <Row label="Papaqueso" value={<SVal v={pasteles.sueltos.papaqueso} />} color="#34d399" />
-        <Row label="Pizza"     value={<SVal v={pasteles.sueltos.pizza} />}     color="#34d399" />
-        <Row label="Queso"     value={<SVal v={pasteles.sueltos.queso} />}     color="#34d399" />
-        {pasteles.sueltos.empanada !== null && pasteles.sueltos.empanada > 0 && (
-          <Row label="Empanada" value={pasteles.sueltos.empanada} color="#34d399" />
-        )}
-        <Row label="Subtotal sueltos" value={pasteles.totalSueltos || <SVal v={null} />} color="#34d399" isTotal />
-
+        <SectionTitle icon="🥐">Pasteles & Pasapalos</SectionTitle>
         <Divider />
-        <SectionTitle icon="">Combos ×6 piezas</SectionTitle>
-        {[
-          'COMBO 6 PASTELES MOLIDA',
-          'COMBO 6 PASTELES PAPAQUESO',
-          'COMBO 6 PASTELES QUESO',
-          'COMBO 6 PASTELES VARIADO'
-        ].reduce((acc, defName) => {
-          if (!acc.some(c => c.nombre === defName)) {
-            acc.push({ nombre: defName, cantidad: 0, piezas: 0 });
-          }
-          return acc;
-        }, [...pasteles.combos6].filter(c => [
-          'COMBO 6 PASTELES MOLIDA',
-          'COMBO 6 PASTELES PAPAQUESO',
-          'COMBO 6 PASTELES QUESO',
-          'COMBO 6 PASTELES VARIADO'
-        ].includes(c.nombre))).map((c, i) => (
-          <Row 
-            key={i} 
-            label={c.nombre} 
-            value={c.cantidad > 0 ? `${c.cantidad} × 6 = ${c.piezas}` : <SVal v={null} />} 
-            color="#6ee7b7" 
-          />
-        ))}
-        <Row label="Piezas combo ×6" value={pasteles.totalCombos6Piezas || <SVal v={null} />} color="#6ee7b7" isTotal />
 
-        {pasteles.combos12.length > 0 && (
-          <>
-            <Divider />
-            <SectionTitle icon="">Combos ×12 piezas</SectionTitle>
-            {pasteles.combos12.map((c, i) => (
-              <Row key={i} label={c.nombre} value={`${c.cantidad} × 12 = ${c.piezas}`} color="#a7f3d0" />
-            ))}
-            <Row label="Piezas combo ×12" value={pasteles.totalCombos12Piezas} color="#a7f3d0" isTotal />
-          </>
-        )}
+        {renderList("Pasapalos de fiesta", pasteles.pasapalos, "#34d399", "SUBTOTAL (Pasapalos)")}
+        {renderList("Pasteles Pequeños", pasteles.pequenos, "#6ee7b7", "SUBTOTAL (Pasteles Pequeños)")}
+        {renderList("Empanadas", pasteles.empanadas, "#a7f3d0", "SUBTOTAL (Empanadas)")}
+        {renderList("Pastel Grande por pieza", pasteles.grandes, "#10b981", "SUBTOTAL (Pastel Grande)")}
+        {renderList("Otros", pasteles.otros, "#059669", "SUBTOTAL (Otros)")}
 
-        <Row label="🥐 Total piezas pasteles" value={pasteles.totalPiezas || <SVal v={null} />} color="#34d399" isTotal bold />
-
-        <Divider />
-        <SectionTitle icon="🧀">Tequeños</SectionTitle>
-
-        <Row label="Tequeño suelto" value={<SVal v={tequeños.sueltos} />} color="#22d3ee" />
-        {tequeños.combos6.map((c, i) => (
-          <Row key={i} label={c.nombre} value={`${c.cantidad} × 6 = ${c.piezas}`} color="#67e8f9" />
-        ))}
-        {tequeños.combos12.map((c, i) => (
-          <Row key={i} label={c.nombre} value={`${c.cantidad} × 12 = ${c.piezas}`} color="#a5f3fc" />
-        ))}
-        {tequeños.pasapalos && (
-          <Row label="Pasapalos 25und" value={`${tequeños.pasapalos.cantidad} × 25 = ${tequeños.pasapalos.piezas}`} color="#7dd3fc" />
-        )}
-        <Row label="🧀 Total piezas tequeños" value={tequeños.totalPiezas || <SVal v={null} />} color="#22d3ee" isTotal bold />
+        <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(16, 185, 129, 0.05)', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+          <SectionTitle icon="📊">TOTALES INSUMOS PASTELES</SectionTitle>
+          {["Pieza F", "Pieza P", "Pieza G", "Bebida"].map(k => {
+             const matchKey = Object.keys(pasteles.totalesInsumos || {}).find(tk => tk.toUpperCase() === k.toUpperCase());
+             const val = matchKey ? pasteles.totalesInsumos[matchKey] : 0;
+             return <Row key={k} label={k.toUpperCase()} value={<SVal v={val} />} color="#6ee7b7" bold={val > 0} />;
+          })}
+        </div>
       </div>
 
       {/* ── Repostería ── */}
       <div className="card">
         <SectionTitle icon="🎂">Repostería</SectionTitle>
-        {reposteria.items.length === 0 ? (
+        {(!reposteria?.items || reposteria.items.length === 0) ? (
           <p style={{ fontSize: '12px', color: '#2d3748', fontStyle: 'italic', marginTop: '8px' }}>Sin ventas hoy</p>
         ) : (
           <>
