@@ -150,3 +150,19 @@ Si quieres, en el siguiente paso te dejo el proyecto real de Next.js ya montado 
 - formulario de arqueo
 - base para webhooks de Evolution y OCR
 
+---
+
+## 📌 Estado Actual (Actualizado - Noche de Cierre)
+
+**✅ Logros completados hoy:**
+1. **Sincronización PSKLOUD Local -> Vercel:** Se reemplazó la conexión directa (que fallaba en producción) por un modelo ETL. El script local `sync-pskloud.js` se conecta al MySQL de PSKLOUD, extrae los datos de ventas (Corte de Caja, Burgers, Pasteles, Tequeños, Repostería) y los sube a la tabla `pskloud_snapshot` en Supabase.
+2. **Dashboard PSKLOUD en Vercel:** El dashboard de producción (`/dashboard`) ahora lee los datos desde Supabase exitosamente (buscando siempre el registro más reciente sin conflictos de zona horaria).
+3. **Integración Tasa BCV:** El panel ahora muestra la tasa del BCV en tiempo real. Se añadieron bloques `try/catch` globales tanto en el webhook como en el panel para asegurar que, si la API de CotizaVE (BCV) falla, el sistema use la tasa `0` sin tumbar la aplicación ni interrumpir la lectura de imágenes.
+4. **Reparación del OCR (Gemini):** Se corrigió un error `404` fatal en la API de Google actualizando el modelo de `gemini-1.5-flash` a `gemini-flash-latest`.
+5. **Webhook de WhatsApp Robusto:** El endpoint `/api/webhooks/whatsapp` ahora ignora correctamente mensajes salientes del bot, respeta el horario comercial (06:00 a 00:00) validando contra la hora de Venezuela (UTC-4), e inserta pagos validados en `pagos_whatsapp`.
+
+**⏳ Pendiente por validar (Mañana a las 06:00 AM):**
+- **Intercepción de nuevas imágenes (Captures):** Debido a que la API de Evolution solo retorna los últimos 50 mensajes en el histórico, los captures enviados durante el fallo del OCR de hoy quedaron inaccesibles para el botón "Sincronizar". 
+- **Acción requerida:** A partir de mañana a las 6:00 AM, las **nuevas** imágenes entrantes deberán ser capturadas en tiempo real por el Webhook sin problemas y reflejarse automáticamente en el panel (`Procesados 1/1`).
+- Mantener ejecutando localmente el script: `node sync-pskloud.js --watch` para que la data del sistema fluya hacia la nube.
+
