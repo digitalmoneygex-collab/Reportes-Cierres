@@ -166,16 +166,27 @@ export default function PskloudPanel({ data, loading }: { data: PskloudData | nu
         )}
         <Row label="Subtotal sueltos" value={pasteles.totalSueltos || <SVal v={null} />} color="#34d399" isTotal />
 
-        {pasteles.combos6.length > 0 && (
-          <>
-            <Divider />
-            <SectionTitle icon="">Combos ×6 piezas</SectionTitle>
-            {pasteles.combos6.map((c, i) => (
-              <Row key={i} label={c.nombre} value={`${c.cantidad} × 6 = ${c.piezas}`} color="#6ee7b7" />
-            ))}
-            <Row label="Piezas combo ×6" value={pasteles.totalCombos6Piezas} color="#6ee7b7" isTotal />
-          </>
-        )}
+        <Divider />
+        <SectionTitle icon="">Combos ×6 piezas</SectionTitle>
+        {[
+          'COMBO 6 PASTELES VARIADO',
+          'PASTELES COMBO CARNE',
+          'PASTELES COMBO PAPAQUESO',
+          'PASTELES COMBO QUESO'
+        ].reduce((acc, defName) => {
+          if (!acc.some(c => c.nombre === defName)) {
+            acc.push({ nombre: defName, cantidad: 0, piezas: 0 });
+          }
+          return acc;
+        }, [...pasteles.combos6]).map((c, i) => (
+          <Row 
+            key={i} 
+            label={c.nombre} 
+            value={c.cantidad > 0 ? `${c.cantidad} × 6 = ${c.piezas}` : <SVal v={null} />} 
+            color="#6ee7b7" 
+          />
+        ))}
+        <Row label="Piezas combo ×6" value={pasteles.totalCombos6Piezas || <SVal v={null} />} color="#6ee7b7" isTotal />
 
         {pasteles.combos12.length > 0 && (
           <>
