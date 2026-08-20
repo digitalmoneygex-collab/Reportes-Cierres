@@ -122,9 +122,11 @@ export async function POST(request: Request) {
 
       const referencia = extractedData.referencia || 'SIN REF';
 
-      // Check duplicado por referencia
-      const since = new Date();
-      since.setHours(0, 0, 0, 0);
+      // Check duplicado por referencia (dentro del día Venezuela)
+      const now = new Date();
+      const tzDate = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Caracas', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+      const [m, d, y] = tzDate.split('/');
+      const since = new Date(`${y}-${m}-${d}T00:00:00.000-04:00`);
       const { data: refDup } = await supabaseAdmin
         .from('pagos_whatsapp')
         .select('id')

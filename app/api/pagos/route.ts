@@ -19,13 +19,14 @@ export async function GET(request: Request) {
     let end: Date;
 
     if (date) {
-      start = new Date(`${date}T00:00:00`);
-      end   = new Date(`${date}T23:59:59.999`);
+      start = new Date(`${date}T00:00:00.000-04:00`);
+      end = new Date(`${date}T23:59:59.999-04:00`);
     } else {
-      start = new Date();
-      start.setHours(0, 0, 0, 0);
-      end   = new Date();
-      end.setHours(23, 59, 59, 999);
+      const now = new Date();
+      const tzDate = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Caracas', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+      const [m, d, y] = tzDate.split('/');
+      start = new Date(`${y}-${m}-${d}T00:00:00.000-04:00`);
+      end = new Date(`${y}-${m}-${d}T23:59:59.999-04:00`);
     }
 
     let query = supabaseAdmin
