@@ -47,33 +47,49 @@ function esCombo12Pastel(nombre) {
 }
 
 // ─── Lógica principal ─────────────────────────────────────────
+// Fecha actual en hora Venezuela (UTC-4), independiente del timezone del servidor
+function fechaVenezuela() {
+  const now = new Date();
+  // Restar 4 horas a UTC para obtener hora VE
+  const vzOffset = -4 * 60; // minutos
+  const utcMinutes = now.getTime() / 60000 + now.getTimezoneOffset();
+  const vzDate = new Date((utcMinutes + vzOffset) * 60000);
+  const y = vzDate.getFullYear();
+  const m = String(vzDate.getMonth() + 1).padStart(2, '0');
+  const d = String(vzDate.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 async function sync() {
+  const today = fechaVenezuela();
   const startTime = new Date().toISOString();
-  console.log(`\n[${startTime}] Iniciando sincronización PSKLOUD -> Supabase...`);
+  console.log(`\n[${startTime}] Sincronizando datos del dia: ${today} (hora Venezuela)`);
 
   let conn;
   try {
     conn = await mysql.createConnection(DB);
     console.log('  OK Conexion MySQL establecida');
 
-    // 1. Total recibido (corte de caja)
+    // 1. Total recibido (corte de caja) - usando fecha Venezuela explícita
     const [[totalRow]] = await conn.query(
       `SELECT COALESCE(SUM(monto), 0) AS total
        FROM operclit
-       WHERE DATE(fecha) = CURDATE()
-         AND tipodoc = 'FAC'`
+       WHERE DATE(fecha) = ?
+         AND tipodoc = 'FAC'`,
+      [today]
     );
     const totalBs = Number(totalRow?.total ?? 0);
 
-    // 2. Articulos del dia (grupos 02, 03, 04)
+    // 2. Articulos del dia (grupos 02, 03, 04) - usando fecha Venezuela explícita
     const [rows] = await conn.query(
       `SELECT grupo, codigo, nombre, SUM(cantidad) AS cantidad
        FROM opermv
-       WHERE DATE(fechadoc) = CURDATE()
+       WHERE DATE(fechadoc) = ?
          AND tipodoc = 'FAC'
          AND grupo IN ('02','03','04')
        GROUP BY grupo, codigo, nombre
-       ORDER BY grupo, codigo, nombre`
+       ORDER BY grupo, codigo, nombre`,
+      [today]
     );
 
     const g02 = rows.filter(r => String(r.grupo).trim() === '02');
