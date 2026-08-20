@@ -1,0 +1,117 @@
+# Integración PSKLOUD → Dashboard
+
+Conectar la base de datos MySQL de PSKLOUD (`adminzuilia`) al dashboard para mostrar dos métricas clave en tiempo real: el total recibido del corte de caja y el conteo detallado de piezas por grupo de producto.
+
+---
+
+## Datos confirmados en DB
+
+- **Total Recibido** → `SELECT SUM(monto) FROM operclit WHERE DATE(fecha)=CURDATE()` → Bs. 308,207.15 ✅
+- **Artículos por grupo** → `opermv` filtrando `grupo IN ('02','03','04')` y `tipodoc='FAC'` ✅
+
+### Grupos detectados hoy:
+| Grupo | Artículos clave |
+|-------|----------------|
+| **02 Pasteles** | PASTEL MOLIDA (C), PASTEL PAPAQUESO (PPQ), PASTEL PIZZA (PZ), PASTEL QUESO (Q), COMBO 6 PASTELES (COMBOP/COMBOV), PASTELES 12+BEBIDA (COMBO12PQ), TEQUEÑO (TQ), COMBO 6 TEQUEÑOS (COMBOTQ), TEQUEÑO 12+BEBIDAS (COMBO12TQ), PASAPALOS 25UND (25T) |
+| **03 Burguer** | HAMB. POLLO (HP), HAMB. CARNE (HS), HAMB. MIXTA (HM), PERRO CALIENTE (PERRO), PATACON |
+| **04 Repostería** | BRAZO GITANO (BG), MILHOJAS RELLENA (MILH) |
+
+---
+
+## Propuesta de cambios
+
+### 1. Instalar mysql2
+```
+npm install mysql2
+```
+
+### 2. [NEW] `lib/pskloud.ts`
+Helper que crea un pool de conexión MySQL usando las variables de entorno `DB_HOST`, `DB_USER`, `DB_PASS`, `DB_NAME`.
+
+### 3. [NEW] `app/api/pskloud/corte-caja/route.ts`
+**Query:** `SELECT SUM(monto) as total FROM operclit WHERE DATE(fecha) = CURDATE() AND estatusrec != 'A'`
+
+Retorna `{ ok, total_bs, total_usd (calculado con tasa BCV) }`.
+
+### 4. [NEW] `app/api/pskloud/ventas-grupo/route.ts`
+**Query:** artículos del día por grupo 02, 03, 04 con `SUM(cantidad)`.
+
+Lógica server-side que agrupa y calcula:
+
+**Burguer (03):**
+- Sueltas: HP (pollo), HS (carne/especial), HM (mixta) → total hamburguesas
+- Combos: artículos con código H7/H10 (si existen) → contar × unidades por combo
+- Perros: PERRO → sueltos; combos si los hay
+- Total panes = sueltas + piezas de combos
+
+**Pasteles (02):**
+- Sueltos: C (molida), PPQ (papaqueso), PZ (pizza), Q (queso) → total piezas
+- Combos de 6: COMBOP, COMBOV → cantidad × 6
+- Combos de 12: COMBO12PQ → cantidad × 12
+- Tequeños sueltos: TQ
+- Combos tequeños 6: COMBOTQ → × 6
+- Combos tequeños 12: COMBO12TQ → × 12
+
+**Repostería (04):** BG, MILH → conteo simple
+
+### 5. [MODIFY] `app/dashboard/page.tsx`
+Agregar una nueva sección **"Resumen PSKLOUD"** debajo del KPI grid actual con:
+
+**Card 1 — Ventas Sistema:**
+- Número grande: `Bs. 308,207.15` en color violeta/índigo brillante
+- Subtítulo: `~ $ 215.xx USD` usando tasa BCV
+- Label: "Ventas Sistema (Corte de Caja)"
+
+**Card 2 — Burguer 🍔:**
+Tabla compacta:
+```
+Hamb. Pollo       17
+Hamb. Carne       16
+Hamb. Mixta        1
+─────────────────────
+Total Hamburguesas 34   → Panes: 34
+Perro Caliente    10   → Panes: 10
+```
+
+**Card 3 — Pasteles 🥐:**
+```
+Pastel Molida      11
+Pastel Papaqueso    3
+Pastel Pizza        7
+Pastel Queso        2
+─────────────────────
+Sueltos:           23
+Combo ×6 (38u):   228   (38 combos × 6)
+Combo ×12 (5u):    60   (5 combos × 12)
+─────────────────────
+Total Pasteles:   311
+Tequeño Suelto:     3
+Combo TQ ×6:      180   (30 combos × 6)
+Combo TQ ×12:      12
+```
+
+**Card 4 — Repostería 🎂:**
+```
+Brazo Gitano       2
+Milhojas           3
+Total:             5
+```
+
+---
+
+## Preguntas abiertas
+
+> [!IMPORTANT]
+> **Lógica combos burguer**: No se detectaron combos H7/H10 hoy en los datos. ¿Los combos de hamburguesas incluyen cuántos panes? (ej: H7=1 hamburguesa, H10=2?) ¿O no tienen combos de hamburguesas en el menú actualmente?
+
+> [!IMPORTANT]
+> **Combos de pasteles**: `COMBOV` aparece con múltiples nombres distintos (COMBO 6 PASTELES VARIADO, PASTELES COMBO CARNE, PASTELES COMBO PAPAQUESO, PASTELES COMBO QUESO). ¿Son todos combo de 6 piezas? ¿O algunos son de otro tamaño?
+
+> [!NOTE]
+> La query usa `operclit.monto` para el total recibido (igual que el corte de caja impreso = 308,207.15). Si quieres usar el total facturado (271,231.05 de `opermv`) se puede cambiar fácilmente.
+
+---
+
+## Verificación
+- Testear con los datos de hoy (2026-08-19) que ya conocemos
+- Agregar `setInterval` de 60s para refrescar datos PSKLOUD automáticamente

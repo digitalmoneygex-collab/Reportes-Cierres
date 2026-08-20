@@ -50,6 +50,7 @@ export default function DashboardPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdate, setLast]   = useState('');
   const [newCount, setNewCount] = useState(0);
+  const [selectedDate, setSelectedDate] = useState<string>('');
   const prevIdsRef              = useRef<Set<string>>(new Set());
 
   const loadTasa = useCallback(async () => {
@@ -60,9 +61,10 @@ export default function DashboardPage() {
     } catch { /* silent */ }
   }, []);
 
-  const loadPagos = useCallback(async () => {
+  const loadPagos = useCallback(async (dateFilter?: string) => {
     try {
-      const res  = await fetch('/api/pagos?limit=50', { cache: 'no-store' });
+      const qs = dateFilter ? `&date=${dateFilter}` : '';
+      const res  = await fetch(`/api/pagos?limit=50${qs}`, { cache: 'no-store' });
       const json = await res.json() as { ok: boolean; data: Pago[] };
       if (json.ok && json.data) {
         const fresh = json.data;
@@ -87,9 +89,10 @@ export default function DashboardPage() {
     } catch { /* silent */ }
   }, []);
 
-  const loadPskloud = useCallback(async () => {
+  const loadPskloud = useCallback(async (dateFilter?: string) => {
     try {
-      const res = await fetch('/api/pskloud/resumen', { cache: 'no-store' });
+      const qs = dateFilter ? `?date=${dateFilter}` : '';
+      const res = await fetch(`/api/pskloud/resumen${qs}`, { cache: 'no-store' });
       const json = await res.json();
       if (json.ok) setPskloudData(json);
     } catch { /* silent */ }
@@ -97,16 +100,20 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    loadPagos();
+    loadPagos(selectedDate);
     loadWA();
     loadTasa();
-    loadPskloud();
-    const id1 = setInterval(loadPagos, 10000); // poll every 10s
-    const id2 = setInterval(loadWA, 15000);
-    const id3 = setInterval(loadTasa, 60000); // poll tasa every 1m
-    const id4 = setInterval(loadPskloud, 60000); // poll pskloud every 1m
+    loadPskloud(selectedDate);
+    
+    // Si hay una fecha seleccionada (historial), no auto-actualizar
+    if (selectedDate) return;
+
+    const id1 = setInterval(() => loadPagos(), 10000); // poll every 10s
+    const id2 = setInterval(() => loadWA(), 15000);
+    const id3 = setInterval(() => loadTasa(), 60000); // poll tasa every 1m
+    const id4 = setInterval(() => loadPskloud(), 60000); // poll pskloud every 1m
     return () => { clearInterval(id1); clearInterval(id2); clearInterval(id3); clearInterval(id4); };
-  }, [loadPagos, loadWA, loadTasa, loadPskloud]);
+  }, [loadPagos, loadWA, loadTasa, loadPskloud, selectedDate]);
 
   const total     = pagos.reduce((s, p) => s + (p.monto_bs ?? 0), 0);
   const totalUsd  = tasa > 0 ? (total / tasa) : 0;
@@ -132,7 +139,9 @@ export default function DashboardPage() {
           <p className="eyebrow" style={{ marginBottom: '4px' }}>{fmtDate()}</p>
           <h1 className="page-title">Dashboard</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '6px', flexWrap: 'wrap' }}>
-            <p className="page-subtitle" style={{ margin: 0 }}>Vista en tiempo real · actualización cada 10 seg</p>
+            <p className="page-subtitle" style={{ margin: 0 }}>
+              {selectedDate ? 'Vista de historial estático' : 'Vista en tiempo real · actualización cada 10 seg'}
+            </p>
             {tasa > 0 && (
               <span style={{
                 display: 'inline-flex',
@@ -160,14 +169,35 @@ export default function DashboardPage() {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {newCount > 0 && (
+          {newCount > 0 && !selectedDate && (
             <button className="badge badge-green" style={{ cursor: 'pointer', border: 'none' }} onClick={() => setNewCount(0)}>
               +{newCount} nuevo{newCount > 1 ? 's' : ''}
             </button>
           )}
-          <span style={{ fontSize: '11px', color: '#2d3748' }}>
-            {lastUpdate ? `Actualizado ${lastUpdate}` : 'Cargando…'}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(148,163,184,0.1)', padding: '4px 8px', borderRadius: '8px' }}>
+            <span style={{ fontSize: '11px', color: '#475569', fontWeight: '600' }}>Historial:</span>
+            <input 
+              type="date" 
+              className="input" 
+              style={{ padding: '4px 8px', fontSize: '12px', height: 'auto', minHeight: '0', width: '120px', background: 'transparent', border: 'none', color: '#e8edf5' }}
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+            />
+            {selectedDate && (
+              <button 
+                className="btn btn-ghost" 
+                style={{ padding: '4px 8px', fontSize: '11px', height: 'auto', minHeight: '0' }}
+                onClick={() => setSelectedDate('')}
+              >
+                Volver a hoy
+              </button>
+            )}
+          </div>
+          {!selectedDate && (
+            <span style={{ fontSize: '11px', color: '#2d3748' }}>
+              {lastUpdate ? `Actualizado ${lastUpdate}` : 'Cargando…'}
+            </span>
+          )}
           <button
             id="dashboard-refresh"
             className="btn btn-ghost btn-sm"
@@ -175,7 +205,7 @@ export default function DashboardPage() {
             onClick={async () => {
               setIsRefreshing(true);
               try {
-                await Promise.all([loadPagos(), loadWA(), loadTasa(), loadPskloud()]);
+                await Promise.all([loadPagos(selectedDate), loadWA(), loadTasa(), loadPskloud(selectedDate)]);
               } finally {
                 setIsRefreshing(false);
               }
@@ -253,7 +283,7 @@ export default function DashboardPage() {
         <div className="card">
           <div style={{ marginBottom: '16px' }}>
             <p style={{ fontSize: '14px', fontWeight: '700', color: '#e8edf5' }}>Capturas por hora</p>
-            <p style={{ fontSize: '11px', color: '#2d3748', marginTop: '2px' }}>Hoy</p>
+            <p style={{ fontSize: '11px', color: '#2d3748', marginTop: '2px' }}>{selectedDate ? `Fecha: ${selectedDate}` : 'Hoy'}</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '80px' }}>
             {byHour.filter(b => b.hour >= 5 && b.hour <= 22).map(b => (
@@ -309,9 +339,9 @@ export default function DashboardPage() {
             <p style={{ fontSize: '14px', fontWeight: '700', color: '#e8edf5' }}>Capturas recientes</p>
             <p style={{ fontSize: '11px', color: '#2d3748', marginTop: '2px' }}>Últimos 50 registros del día</p>
           </div>
-          <span className="badge badge-green" style={{ gap: '6px' }}>
-            <span className="dot dot-pulse" style={{ background: '#34d399', width: '6px', height: '6px' }} />
-            En vivo
+          <span className={`badge ${selectedDate ? 'badge-yellow' : 'badge-green'}`} style={{ gap: '6px' }}>
+            <span className="dot dot-pulse" style={{ background: selectedDate ? '#fbbf24' : '#34d399', width: '6px', height: '6px' }} />
+            {selectedDate ? 'Historial' : 'En vivo'}
           </span>
         </div>
 
