@@ -44,6 +44,7 @@ export default function DashboardPage() {
   const [waInst, setWaInst]     = useState<WaInstance | null>(null);
   const [tasa, setTasa]         = useState<number>(0);
   const [loading, setLoading]   = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdate, setLast]   = useState('');
   const [newCount, setNewCount] = useState(0);
   const prevIdsRef              = useRef<Set<string>>(new Set());
@@ -116,7 +117,33 @@ export default function DashboardPage() {
         <div>
           <p className="eyebrow" style={{ marginBottom: '4px' }}>{fmtDate()}</p>
           <h1 className="page-title">Dashboard</h1>
-          <p className="page-subtitle">Vista en tiempo real · actualización cada 10 seg</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '6px', flexWrap: 'wrap' }}>
+            <p className="page-subtitle" style={{ margin: 0 }}>Vista en tiempo real · actualización cada 10 seg</p>
+            {tasa > 0 && (
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'linear-gradient(135deg, rgba(251,191,36,0.15) 0%, rgba(245,158,11,0.1) 100%)',
+                border: '1px solid rgba(251,191,36,0.35)',
+                borderRadius: '8px',
+                padding: '4px 12px',
+                fontFamily: 'Inter, sans-serif',
+                fontSize: '13px',
+                fontWeight: '800',
+                color: '#fbbf24',
+                letterSpacing: '-0.01em',
+                boxShadow: '0 0 16px rgba(251,191,36,0.12)',
+                textShadow: '0 0 12px rgba(251,191,36,0.4)',
+              }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="1" x2="12" y2="23"/>
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
+                Tasa BCV: Bs.&nbsp;{tasa.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            )}
+          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {newCount > 0 && (
@@ -130,13 +157,24 @@ export default function DashboardPage() {
           <button
             id="dashboard-refresh"
             className="btn btn-ghost btn-sm"
-            onClick={() => { loadPagos(); loadWA(); loadTasa(); }}
+            disabled={isRefreshing}
+            onClick={async () => {
+              setIsRefreshing(true);
+              try {
+                await Promise.all([loadPagos(), loadWA(), loadTasa()]);
+              } finally {
+                setIsRefreshing(false);
+              }
+            }}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              style={{ transition: 'transform 0.6s ease', transform: isRefreshing ? 'rotate(360deg)' : 'rotate(0deg)' }}
+              width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+            >
               <polyline points="23 4 23 10 17 10"/>
               <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
             </svg>
-            Refrescar
+            {isRefreshing ? 'Actualizando...' : 'Refrescar'}
           </button>
         </div>
       </div>
