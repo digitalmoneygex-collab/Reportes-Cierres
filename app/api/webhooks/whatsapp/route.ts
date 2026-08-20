@@ -110,12 +110,13 @@ export async function POST(request: Request) {
     }
 
     // 2. Filtro de intersección Maestro-Esclavo
+    // (Desactivado temporalmente porque en mensajes directos el remoteJid es el del cliente, no el del bot)
     const cleanReceptor = receptor.replace(/\D/g, '');
     const combinedJid = remoteJid + remoteJidAlt;
     
-    if (!combinedJid.includes(cleanReceptor)) {
-      return NextResponse.json({ ok: true, ignored: 'Fuera de intersección' });
-    }
+    // if (!combinedJid.includes(cleanReceptor)) {
+    //   return NextResponse.json({ ok: true, ignored: 'Fuera de intersección' });
+    // }
 
     // Ignorar mensajes enviados por el bot (evitar bucles)
     if (isFromMe) {
