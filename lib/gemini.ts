@@ -30,7 +30,9 @@ export async function readPaymentReceiptImage(base64Image: string) {
             },
           },
         ],
-      });
+      }
+    ],
+  });
       break; // Success, exit loop
     } catch (error: any) {
       console.error(`Gemini API Error: ${error.message}`);
