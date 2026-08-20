@@ -8,6 +8,12 @@ type Config = {
   webhookUrl: string;
   instanceName: string;
   numeroReceptor: string;
+  cotizaveApiKey: string;
+  horario1: string;
+  horario2: string;
+  horario3: string;
+  tasaDolar: number;
+  ultimaActualizacionTasa: string | null;
 };
 
 const DEFAULT: Config = {
@@ -16,6 +22,12 @@ const DEFAULT: Config = {
   webhookUrl: 'https://reportes-cierres-psi.vercel.app/api/webhooks/whatsapp',
   instanceName: 'mi_bot',
   numeroReceptor: '',
+  cotizaveApiKey: '',
+  horario1: '06:00',
+  horario2: '12:00',
+  horario3: '18:00',
+  tasaDolar: 0,
+  ultimaActualizacionTasa: null,
 };
 
 export default function ConfiguracionPage() {
@@ -172,6 +184,61 @@ export default function ConfiguracionPage() {
             <InfoBox label="Evolution API" value="✓ Activo :8081" color="#34d399" />
             <InfoBox label="VPS IP" value="144.126.129.154" color="#94a3b8" />
             <InfoBox label="Versión" value="v2.3.7" color="#94a3b8" />
+          </div>
+        </div>
+
+        {/* CotizaVE */}
+        <div className="card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+            <div style={iconWrap}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+              </svg>
+            </div>
+            <div style={{ flex: 1 }}>
+              <p style={cardTitle}>Integración CotizaVE (BCV)</p>
+              <p style={cardSub}>Tasa oficial de cambio USD - Bs.S</p>
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={async () => {
+              try {
+                const res = await fetch('/api/tasa?force=true');
+                const json = await res.json();
+                if (json.ok) {
+                  setCfg(p => ({ ...p, tasaDolar: json.tasa, ultimaActualizacionTasa: json.last_update }));
+                  alert(`Tasa actualizada: Bs. ${json.tasa}`);
+                }
+              } catch {
+                alert('Error al forzar actualización de tasa');
+              }
+            }}>
+              Actualizar Ahora
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+            <div>
+              <p className="label" style={{ marginBottom: '8px' }}>Tasa Actual Guardada</p>
+              <div style={{ padding: '12px 14px', background: 'rgba(52,211,153,0.06)', borderRadius: '10px', border: '1px solid rgba(52,211,153,0.2)' }}>
+                <p style={{ fontSize: '18px', fontWeight: '800', color: '#34d399' }}>Bs. {cfg.tasaDolar || '0.00'}</p>
+                <p style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
+                  Última vez: {cfg.ultimaActualizacionTasa ? new Date(cfg.ultimaActualizacionTasa).toLocaleString('es-VE') : 'Nunca'}
+                </p>
+              </div>
+            </div>
+            <div>
+              <p className="label" style={{ marginBottom: '8px' }}>API Key (Opcional si usas .env)</p>
+              <input type="text" className="input" value={cfg.cotizaveApiKey} onChange={set('cotizaveApiKey')} placeholder="ctz_live_..." />
+            </div>
+          </div>
+
+          <div>
+            <p className="label" style={{ marginBottom: '8px' }}>Horarios de Actualización Automática</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+              <input type="time" className="input" value={cfg.horario1} onChange={set('horario1')} />
+              <input type="time" className="input" value={cfg.horario2} onChange={set('horario2')} />
+              <input type="time" className="input" value={cfg.horario3} onChange={set('horario3')} />
+            </div>
+            <p style={{ fontSize: '11px', color: '#2d3748', marginTop: '6px' }}>Solo se harán llamadas a la API a estas horas (máx 3/día).</p>
           </div>
         </div>
 

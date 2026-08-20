@@ -7,6 +7,7 @@ type Pago = {
   created_at: string;
   telefono_emisor: string;
   monto_bs: number;
+  monto_usd?: number;
   referencia: string;
   banco_origen: string;
   metodo: string;
@@ -29,10 +30,19 @@ function fmtDT(iso: string) {
 
 export default function PagosPage() {
   const [pagos, setPagos]       = useState<Pago[]>([]);
+  const [tasa, setTasa]         = useState<number>(0);
   const [loading, setLoading]   = useState(true);
   const [filterDate, setDate]   = useState(new Date().toISOString().split('T')[0]);
   const [filterBanco, setBanco] = useState('Todos');
   const [search, setSearch]     = useState('');
+
+  const loadTasa = useCallback(async () => {
+    try {
+      const res = await fetch('/api/tasa', { cache: 'no-store' });
+      const json = await res.json();
+      if (json.ok && json.tasa) setTasa(json.tasa);
+    } catch { /* silent */ }
+  }, []);
 
   const loadPagos = useCallback(async () => {
     setLoading(true);
@@ -49,11 +59,13 @@ export default function PagosPage() {
   }, [filterDate, filterBanco, search]);
 
   useEffect(() => {
+    loadTasa();
     const id = setTimeout(loadPagos, 300); // debounce search
     return () => clearTimeout(id);
-  }, [loadPagos]);
+  }, [loadPagos, loadTasa]);
 
   const total     = pagos.reduce((s, p) => s + (p.monto_bs ?? 0), 0);
+  const totalUsd  = tasa > 0 ? (total / tasa) : 0;
   const procesados = pagos.filter(p => p.procesado).length;
 
   const exportCSV = () => {
@@ -119,14 +131,15 @@ export default function PagosPage() {
       {/* Summary KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px', marginBottom: '20px' }}>
         {[
-          { label: 'Total filtrado', value: fmtBs(total), color: '#818cf8' },
+          { label: 'Total filtrado', value: fmtBs(total), usd: tasa > 0 ? `~ $ ${totalUsd.toFixed(2)} USD` : null, color: '#818cf8' },
           { label: 'Registros', value: String(pagos.length), color: '#34d399' },
           { label: 'Procesados', value: String(procesados), color: '#22d3ee' },
           { label: 'Pendientes', value: String(pagos.length - procesados), color: '#fbbf24' },
-        ].map(({ label, value, color }) => (
+        ].map(({ label, value, color, usd }) => (
           <div key={label} className="card">
             <p className="label" style={{ marginBottom: '10px' }}>{label}</p>
             <p style={{ fontSize: '22px', fontWeight: '900', color, letterSpacing: '-0.04em' }}>{loading ? '…' : value}</p>
+            {usd && <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px', fontWeight: '500' }}>{usd}</p>}
           </div>
         ))}
       </div>
@@ -181,7 +194,14 @@ export default function PagosPage() {
                         <td style={{ fontWeight: '500', fontSize: '13px' }}>{p.banco_origen || '—'}</td>
                         <td style={{ fontFamily: 'monospace', fontSize: '12px', color: '#818cf8' }}>{p.referencia || '—'}</td>
                         <td style={{ fontSize: '12px' }}>{p.telefono_emisor || '—'}</td>
-                        <td style={{ fontWeight: '800', color: '#34d399', fontSize: '13px' }}>{fmtBs(p.monto_bs)}</td>
+                        <td>
+                      <div style={{ fontWeight: '800', color: '#34d399', fontSize: '13px' }}>{fmtBs(p.monto_bs)}</div>
+                      {(p.monto_usd || (tasa > 0 ? (p.monto_bs / tasa) : 0)) > 0 && (
+                        <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px', fontWeight: '500' }}>
+                          ~ $ {(p.monto_usd || (p.monto_bs / tasa)).toFixed(2)} USD
+                        </div>
+                      )}
+                    </td>
                         <td style={{ fontSize: '12px', color: '#475569' }}>{p.metodo || '—'}</td>
                         <td>
                           <span className={`badge ${p.procesado ? 'badge-green' : 'badge-yellow'}`}>

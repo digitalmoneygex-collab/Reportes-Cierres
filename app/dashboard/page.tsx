@@ -7,6 +7,7 @@ type Pago = {
   created_at: string;
   telefono_emisor: string;
   monto_bs: number;
+  monto_usd?: number;
   referencia: string;
   banco_origen: string;
   metodo: string;
@@ -41,10 +42,19 @@ const fmtDate = () =>
 export default function DashboardPage() {
   const [pagos, setPagos]       = useState<Pago[]>([]);
   const [waInst, setWaInst]     = useState<WaInstance | null>(null);
+  const [tasa, setTasa]         = useState<number>(0);
   const [loading, setLoading]   = useState(true);
   const [lastUpdate, setLast]   = useState('');
   const [newCount, setNewCount] = useState(0);
   const prevIdsRef              = useRef<Set<string>>(new Set());
+
+  const loadTasa = useCallback(async () => {
+    try {
+      const res = await fetch('/api/tasa', { cache: 'no-store' });
+      const json = await res.json();
+      if (json.ok && json.tasa) setTasa(json.tasa);
+    } catch { /* silent */ }
+  }, []);
 
   const loadPagos = useCallback(async () => {
     try {
@@ -76,12 +86,15 @@ export default function DashboardPage() {
   useEffect(() => {
     loadPagos();
     loadWA();
+    loadTasa();
     const id1 = setInterval(loadPagos, 10000); // poll every 10s
     const id2 = setInterval(loadWA, 15000);
-    return () => { clearInterval(id1); clearInterval(id2); };
-  }, [loadPagos, loadWA]);
+    const id3 = setInterval(loadTasa, 60000); // poll tasa every 1m
+    return () => { clearInterval(id1); clearInterval(id2); clearInterval(id3); };
+  }, [loadPagos, loadWA, loadTasa]);
 
   const total     = pagos.reduce((s, p) => s + (p.monto_bs ?? 0), 0);
+  const totalUsd  = tasa > 0 ? (total / tasa) : 0;
   const procesados = pagos.filter(p => p.procesado).length;
 
   const waColor = waInst?.connectionStatus === 'open' ? '#34d399'
@@ -117,7 +130,7 @@ export default function DashboardPage() {
           <button
             id="dashboard-refresh"
             className="btn btn-ghost btn-sm"
-            onClick={() => { loadPagos(); loadWA(); }}
+            onClick={() => { loadPagos(); loadWA(); loadTasa(); }}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="23 4 23 10 17 10"/>
@@ -134,9 +147,12 @@ export default function DashboardPage() {
         <div className="card-glow" style={{ background: 'linear-gradient(135deg, #0c1428 0%, #101a2e 100%)' }}>
           <p className="label" style={{ marginBottom: '12px', color: '#475569' }}>Total del día</p>
           {loading ? <div className="skeleton" style={{ height: '36px', marginBottom: '6px' }} /> : (
-            <p style={{ fontSize: '26px', fontWeight: '900', color: '#818cf8', letterSpacing: '-0.06em', lineHeight: 1 }}>{fmtBs(total)}</p>
+            <div>
+              <p style={{ fontSize: '26px', fontWeight: '900', color: '#818cf8', letterSpacing: '-0.06em', lineHeight: 1 }}>{fmtBs(total)}</p>
+              {tasa > 0 && <p style={{ fontSize: '13px', color: '#34d399', marginTop: '6px', fontWeight: '600' }}>~ $ {totalUsd.toFixed(2)} USD</p>}
+            </div>
           )}
-          <p style={{ fontSize: '12px', color: '#2d3748', marginTop: '6px' }}>Bolívares acumulados hoy</p>
+          <p style={{ fontSize: '12px', color: '#2d3748', marginTop: '6px' }}>Acumulado hoy {tasa > 0 ? `(Tasa BCV: Bs. ${tasa})` : ''}</p>
         </div>
 
         {/* Capturas */}
@@ -271,7 +287,14 @@ export default function DashboardPage() {
                     <td style={{ fontWeight: '500', fontSize: '13px' }}>{p.banco_origen || '—'}</td>
                     <td style={{ fontFamily: 'monospace', fontSize: '12px', color: '#818cf8' }}>{p.referencia || '—'}</td>
                     <td style={{ fontSize: '12px' }}>{p.telefono_emisor || '—'}</td>
-                    <td style={{ fontWeight: '800', color: '#34d399', fontSize: '13px' }}>{fmtBs(p.monto_bs)}</td>
+                    <td>
+                      <div style={{ fontWeight: '800', color: '#34d399', fontSize: '13px' }}>{fmtBs(p.monto_bs)}</div>
+                      {(p.monto_usd || (tasa > 0 ? (p.monto_bs / tasa) : 0)) > 0 && (
+                        <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px', fontWeight: '500' }}>
+                          ~ $ {(p.monto_usd || (p.monto_bs / tasa)).toFixed(2)} USD
+                        </div>
+                      )}
+                    </td>
                     <td>
                       <span className={`badge ${p.procesado ? 'badge-green' : 'badge-yellow'}`}>
                         {p.procesado ? '✓ Procesado' : '⏳ Pendiente'}

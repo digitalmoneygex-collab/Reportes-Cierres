@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { readPaymentReceiptImage } from '@/lib/gemini';
+import { getTasaDelDia } from '@/lib/tasa';
 
 const EVOLUTION_URL = (process.env.SERVER_URL ?? 'http://144.126.129.154:8081').replace(/\/$/, '');
 const EVOLUTION_KEY = process.env.EVOLUTION_API_KEY ?? '';
@@ -137,10 +138,17 @@ export async function POST(request: Request) {
 
       const esDup = !!refDup;
 
+      // Calcular monto en dólares si la tasa es mayor a 0
+      const tasa = await getTasaDelDia(false);
+      const monto_bs = extractedData.monto_bs || 0;
+      const monto_usd = tasa > 0 ? (monto_bs / tasa).toFixed(2) : 0;
+
       await supabaseAdmin.from('pagos_whatsapp').insert({
         message_id:      messageId,
         telefono_emisor: cleanReceptor,
-        monto_bs:        extractedData.monto_bs || 0,
+        monto_bs,
+        monto_usd:       Number(monto_usd),
+        tasa_aplicada:   tasa,
         referencia,
         banco_origen:    extractedData.banco_origen || 'Desconocido',
         metodo:          extractedData.metodo || 'otro',

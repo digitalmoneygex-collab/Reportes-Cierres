@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { readPaymentReceiptImage } from '@/lib/gemini';
+import { getTasaDelDia } from '@/lib/tasa';
 
 const EVOLUTION_URL = (process.env.SERVER_URL ?? 'http://144.126.129.154:8081').replace(/\/$/, '');
 const EVOLUTION_KEY = process.env.EVOLUTION_API_KEY ?? '';
@@ -183,12 +184,18 @@ export async function POST(request: Request) {
     const referencia = extractedData.referencia || 'SIN REF';
     const existingByRef = await findDuplicateByReferencia(referencia);
 
+    const tasa = await getTasaDelDia(false);
+    const monto_bs = extractedData.monto_bs || 0;
+    const monto_usd = tasa > 0 ? (monto_bs / tasa).toFixed(2) : 0;
+
     if (existingByRef) {
       // Guardar como duplicado pero no contarlo
       await supabaseAdmin.from('pagos_whatsapp').insert({
         message_id:      messageId || null,
         telefono_emisor: cleanReceptor, // Almacenar el número limpio del receptor como emisor, o extraer del alt
-        monto_bs:        extractedData.monto_bs   || 0,
+        monto_bs,
+        monto_usd:       Number(monto_usd),
+        tasa_aplicada:   tasa,
         referencia,
         banco_origen:    extractedData.banco_origen || 'Desconocido',
         metodo:          extractedData.metodo       || 'otro',
@@ -209,7 +216,9 @@ export async function POST(request: Request) {
     const { error: dbError } = await supabaseAdmin.from('pagos_whatsapp').insert({
       message_id:      messageId || null,
       telefono_emisor: cleanReceptor,
-      monto_bs:        extractedData.monto_bs   || 0,
+      monto_bs,
+      monto_usd:       Number(monto_usd),
+      tasa_aplicada:   tasa,
       referencia,
       banco_origen:    extractedData.banco_origen || 'Desconocido',
       metodo:          extractedData.metodo       || 'otro',
