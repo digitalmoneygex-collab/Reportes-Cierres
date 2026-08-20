@@ -22,7 +22,7 @@ type QrData = {
   error?: string;
 };
 
-type SyncResult = { procesados: number; duplicados: number; errores: number; total: number } | null;
+type SyncResult = { procesados: number; duplicados: number; errores: number; total: number; errorDetails?: string[] } | null;
 
 export default function ConexionPage() {
   const [instance, setInstance] = useState<WaInstance | null>(null);
@@ -72,7 +72,7 @@ export default function ConexionPage() {
     try {
       const res  = await fetch('/api/evolution/sync', { method: 'POST', cache: 'no-store' });
       const data = await res.json();
-      if (data.ok) setSyncResult(data.resumen);
+      if (data.ok) setSyncResult({ ...data.resumen, errorDetails: data.errorDetails });
       else setApiError(data.error ?? 'Error en sincronización');
     } catch (e: unknown) {
       setApiError(e instanceof Error ? e.message : 'Error de red');
@@ -198,6 +198,15 @@ export default function ConexionPage() {
                   <p style={{ fontSize: '11px', color: '#94a3b8' }}>✔ Procesados: <strong style={{color:'#e8edf5'}}>{syncResult.procesados}</strong></p>
                   <p style={{ fontSize: '11px', color: '#94a3b8' }}>⚠ Duplicados: <strong style={{color:'#fbbf24'}}>{syncResult.duplicados}</strong></p>
                   <p style={{ fontSize: '11px', color: '#94a3b8' }}>✖ Errores: <strong style={{color:'#f87171'}}>{syncResult.errores}</strong></p>
+                  {syncResult.errores > 0 && syncResult.errorDetails && syncResult.errorDetails.length > 0 && (
+                    <div style={{ marginTop: '10px', maxHeight: '100px', overflowY: 'auto', background: 'rgba(0,0,0,0.2)', padding: '6px', borderRadius: '6px', fontSize: '10px', color: '#f87171' }}>
+                      {syncResult.errorDetails.map((e, idx) => (
+                        <div key={idx} style={{ marginBottom: '4px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '4px' }}>
+                          {e}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
