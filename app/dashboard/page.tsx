@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import PskloudPanel from '@/app/components/PskloudPanel';
 
 type Pago = {
   id: string;
@@ -44,6 +45,8 @@ export default function DashboardPage() {
   const [waInst, setWaInst]     = useState<WaInstance | null>(null);
   const [tasa, setTasa]         = useState<number>(0);
   const [loading, setLoading]   = useState(true);
+  const [pskloudData, setPskloudData] = useState<any>(null);
+  const [pskloudLoading, setPskloudLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdate, setLast]   = useState('');
   const [newCount, setNewCount] = useState(0);
@@ -84,15 +87,26 @@ export default function DashboardPage() {
     } catch { /* silent */ }
   }, []);
 
+  const loadPskloud = useCallback(async () => {
+    try {
+      const res = await fetch('/api/pskloud/resumen', { cache: 'no-store' });
+      const json = await res.json();
+      if (json.ok) setPskloudData(json);
+    } catch { /* silent */ }
+    setPskloudLoading(false);
+  }, []);
+
   useEffect(() => {
     loadPagos();
     loadWA();
     loadTasa();
+    loadPskloud();
     const id1 = setInterval(loadPagos, 10000); // poll every 10s
     const id2 = setInterval(loadWA, 15000);
     const id3 = setInterval(loadTasa, 60000); // poll tasa every 1m
-    return () => { clearInterval(id1); clearInterval(id2); clearInterval(id3); };
-  }, [loadPagos, loadWA, loadTasa]);
+    const id4 = setInterval(loadPskloud, 60000); // poll pskloud every 1m
+    return () => { clearInterval(id1); clearInterval(id2); clearInterval(id3); clearInterval(id4); };
+  }, [loadPagos, loadWA, loadTasa, loadPskloud]);
 
   const total     = pagos.reduce((s, p) => s + (p.monto_bs ?? 0), 0);
   const totalUsd  = tasa > 0 ? (total / tasa) : 0;
@@ -161,7 +175,7 @@ export default function DashboardPage() {
             onClick={async () => {
               setIsRefreshing(true);
               try {
-                await Promise.all([loadPagos(), loadWA(), loadTasa()]);
+                await Promise.all([loadPagos(), loadWA(), loadTasa(), loadPskloud()]);
               } finally {
                 setIsRefreshing(false);
               }
@@ -222,6 +236,15 @@ export default function DashboardPage() {
             {waInst?.profileName ?? waInst?.name ?? 'mi_bot'}
           </p>
         </div>
+      </div>
+
+      {/* Resumen PSKLOUD */}
+      <div style={{ marginBottom: '28px' }}>
+        <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#e8edf5', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span className="dot dot-pulse" style={{ background: '#6366f1' }}></span>
+          Datos PSKLOUD (En vivo)
+        </h2>
+        <PskloudPanel data={pskloudData} loading={pskloudLoading} />
       </div>
 
       {/* Chart + Table row */}
