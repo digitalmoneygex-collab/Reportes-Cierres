@@ -194,16 +194,31 @@ export default function PskloudPanel({ data, loading }: { data: PskloudData | nu
       {/* ── Repostería ── */}
       <div className="card">
         <SectionTitle icon="🎂">Repostería</SectionTitle>
-        {(!reposteria?.items || reposteria.items.length === 0) ? (
-          <p style={{ fontSize: '12px', color: '#2d3748', fontStyle: 'italic', marginTop: '8px' }}>Sin ventas hoy</p>
-        ) : (
-          <>
-            {reposteria.items.map((item, i) => (
-              <Row key={i} label={item.nombre} value={item.cantidad} color="#c084fc" />
-            ))}
-            <Row label="🎂 Total" value={reposteria.total} color="#c084fc" isTotal bold />
-          </>
-        )}
+        <Divider />
+        {(() => {
+          const defaultItems = ['NESCAFE+MILHOJA', 'BRAZO GITANO', 'BOMBA', 'MILHOJAS RELLENA'];
+          const items = [...(reposteria?.items || [])];
+          
+          defaultItems.forEach(def => {
+            if (!items.some(i => i.nombre === def)) {
+              items.push({ nombre: def, cantidad: 0 });
+            }
+          });
+          
+          return (
+            <>
+              {items.map((item, i) => (
+                <Row 
+                  key={i} 
+                  label={item.nombre} 
+                  value={<SVal v={item.cantidad} />} 
+                  color="#c084fc" 
+                />
+              ))}
+              <Row label="🎂 Total" value={reposteria?.total || <SVal v={0} />} color="#c084fc" isTotal bold />
+            </>
+          );
+        })()}
       </div>
     </div>
   );
