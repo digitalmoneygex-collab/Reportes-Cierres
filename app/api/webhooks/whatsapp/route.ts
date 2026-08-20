@@ -185,7 +185,13 @@ export async function POST(request: Request) {
     const referencia = extractedData.referencia || 'SIN REF';
     const existingByRef = await findDuplicateByReferencia(referencia);
 
-    const tasa = await getTasaDelDia(false);
+    let tasa = 0;
+    try {
+      tasa = await getTasaDelDia(false);
+    } catch (tasaErr) {
+      console.error('Error obteniendo tasa BCV en webhook, usando 0:', tasaErr);
+    }
+    
     const monto_bs = extractedData.monto_bs || 0;
     const monto_usd = tasa > 0 ? (monto_bs / tasa).toFixed(2) : 0;
 
