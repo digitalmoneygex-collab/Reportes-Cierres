@@ -6,15 +6,13 @@ import { getTasaDelDia } from '@/lib/tasa';
 // Lee el snapshot más reciente subido por sync-pskloud.js local
 export async function GET() {
   try {
-    // Fecha Venezuela (UTC-4)
-    const vzDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Caracas' }));
-    const today = `${vzDate.getFullYear()}-${String(vzDate.getMonth() + 1).padStart(2, '0')}-${String(vzDate.getDate()).padStart(2, '0')}`;
-
+    // Buscar el snapshot más reciente (sin filtrar por fecha exacta para evitar problemas de timezone)
     const [{ data, error }, tasaResult] = await Promise.all([
       supabaseAdmin
         .from('pskloud_snapshot')
         .select('*')
-        .eq('fecha', today)
+        .order('synced_at', { ascending: false })
+        .limit(1)
         .maybeSingle(),
       getTasaDelDia().catch(() => 0), // Si falla la tasa, usar 0 sin romper el route
     ]);
@@ -26,10 +24,15 @@ export async function GET() {
     if (!data) {
       return NextResponse.json({
         ok: false,
-        error: 'Sin datos PSKLOUD para hoy. Ejecuta sync-pskloud.js en la PC local.',
+        error: 'Sin datos PSKLOUD. Ejecuta: node sync-pskloud.js en la PC local.',
         noData: true,
       });
     }
+
+    // Verificar que el snapshot sea del día de hoy (Venezuela) o de las últimas 24h
+    const syncedAt  = new Date(data.synced_at);
+    const hoursAgo  = (Date.now() - syncedAt.getTime()) / (1000 * 60 * 60);
+    const isRecent  = hoursAgo < 24;
 
     const tasa     = Number(tasaResult ?? 0);
     const totalBs  = Number(data.corte_caja_bs ?? 0);
@@ -38,6 +41,7 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       synced_at: data.synced_at,
+      is_recent: isRecent,
       corteCaja: {
         totalBs,
         tasa,
