@@ -227,32 +227,32 @@ export default function DashboardPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '28px' }}>
         {/* Total */}
         <div className="card-glow" style={{ background: 'linear-gradient(135deg, #0c1428 0%, #101a2e 100%)' }}>
-          <p className="label" style={{ marginBottom: '12px', color: '#475569' }}>Total del día</p>
+          <p className="label" style={{ marginBottom: '12px', color: '#475569' }}>Pagos Móviles del Día</p>
           {loading ? <div className="skeleton" style={{ height: '36px', marginBottom: '6px' }} /> : (
             <div>
               <p style={{ fontSize: '26px', fontWeight: '900', color: '#818cf8', letterSpacing: '-0.06em', lineHeight: 1 }}>{fmtBs(total)}</p>
               {tasa > 0 && <p style={{ fontSize: '13px', color: '#34d399', marginTop: '6px', fontWeight: '600' }}>~ $ {totalUsd.toFixed(2)} USD</p>}
             </div>
           )}
-          <p style={{ fontSize: '12px', color: '#2d3748', marginTop: '6px' }}>Acumulado hoy {tasa > 0 ? `(Tasa BCV: Bs. ${tasa})` : ''}</p>
+          <p style={{ fontSize: '12px', color: '#2d3748', marginTop: '6px' }}>Pagos móviles recibidos hoy {tasa > 0 ? `(Tasa BCV: Bs. ${tasa})` : ''}</p>
         </div>
 
         {/* Capturas */}
         <div className="card">
-          <p className="label" style={{ marginBottom: '12px' }}>Capturas</p>
+          <p className="label" style={{ marginBottom: '12px' }}>Capturas Móviles</p>
           {loading ? <div className="skeleton" style={{ height: '36px', marginBottom: '6px' }} /> : (
             <p style={{ fontSize: '36px', fontWeight: '900', color: '#34d399', letterSpacing: '-0.06em', lineHeight: 1 }}>{pagos.length}</p>
           )}
-          <p style={{ fontSize: '12px', color: '#2d3748', marginTop: '6px' }}>Mensajes recibidos hoy</p>
+          <p style={{ fontSize: '12px', color: '#2d3748', marginTop: '6px' }}>Comprobantes recibidos hoy</p>
         </div>
 
         {/* Procesados */}
         <div className="card">
-          <p className="label" style={{ marginBottom: '12px' }}>Procesados</p>
+          <p className="label" style={{ marginBottom: '12px' }}>Procesados (OCR)</p>
           {loading ? <div className="skeleton" style={{ height: '36px', marginBottom: '6px' }} /> : (
             <p style={{ fontSize: '36px', fontWeight: '900', color: '#22d3ee', letterSpacing: '-0.06em', lineHeight: 1 }}>{procesados}</p>
           )}
-          <p style={{ fontSize: '12px', color: '#2d3748', marginTop: '6px' }}>OCR / parsing completado</p>
+          <p style={{ fontSize: '12px', color: '#2d3748', marginTop: '6px' }}>Comprobantes verificados</p>
         </div>
 
         {/* WhatsApp */}
@@ -316,9 +316,9 @@ export default function DashboardPage() {
           <p style={{ fontSize: '14px', fontWeight: '700', color: '#e8edf5', marginBottom: '16px' }}>Resumen del día</p>
           <div style={{ display: 'grid', gap: '0' }}>
             {[
-              { label: 'Total Bs.S', value: fmtBs(total), color: '#818cf8' },
-              { label: 'Capturas totales', value: pagos.length.toString(), color: '#e8edf5' },
-              { label: 'Procesadas (OCR)', value: `${procesados} / ${pagos.length}`, color: '#34d399' },
+              { label: 'Pagos Móviles Bs.S', value: fmtBs(total), color: '#818cf8' },
+              { label: 'Comprobantes recibidos', value: pagos.length.toString(), color: '#e8edf5' },
+              { label: 'Verificados (OCR)', value: `${procesados} / ${pagos.length}`, color: '#34d399' },
               { label: 'Tasa de éxito', value: pagos.length > 0 ? `${Math.round((procesados / pagos.length) * 100)}%` : '—', color: '#22d3ee' },
               { label: 'Instancia WA', value: waInst?.name ?? 'mi_bot', color: '#94a3b8' },
               { label: 'Estado WA', value: waLabel, color: waColor },
@@ -336,8 +336,8 @@ export default function DashboardPage() {
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px 16px' }}>
           <div>
-            <p style={{ fontSize: '14px', fontWeight: '700', color: '#e8edf5' }}>Capturas recientes</p>
-            <p style={{ fontSize: '11px', color: '#2d3748', marginTop: '2px' }}>Últimos 50 registros del día</p>
+            <p style={{ fontSize: '14px', fontWeight: '700', color: '#e8edf5' }}>Pagos Móviles Recientes</p>
+            <p style={{ fontSize: '11px', color: '#2d3748', marginTop: '2px' }}>Últimos 50 comprobantes del día</p>
           </div>
           <span className={`badge ${selectedDate ? 'badge-yellow' : 'badge-green'}`} style={{ gap: '6px' }}>
             <span className="dot dot-pulse" style={{ background: selectedDate ? '#fbbf24' : '#34d399', width: '6px', height: '6px' }} />
@@ -353,9 +353,9 @@ export default function DashboardPage() {
         ) : pagos.length === 0 ? (
           <div style={{ padding: '60px', textAlign: 'center' }}>
             <div style={{ fontSize: '40px', marginBottom: '12px' }}>📭</div>
-            <p style={{ color: '#475569', fontWeight: '600' }}>Sin capturas hoy</p>
+            <p style={{ color: '#475569', fontWeight: '600' }}>Sin pagos móviles hoy</p>
             <p style={{ color: '#2d3748', fontSize: '12px', marginTop: '6px' }}>
-              Los pagos de WhatsApp aparecerán aquí automáticamente
+              Los comprobantes de pago móvil aparecerán aquí automáticamente
             </p>
           </div>
         ) : (
