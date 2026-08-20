@@ -157,7 +157,7 @@ async function sync() {
 
     // Payload para Supabase
     const payload = {
-      fecha: new Date().toISOString().split('T')[0],
+      fecha: today,  // fecha Venezuela (UTC-4) — debe coincidir con lo que busca la API de Vercel
       synced_at: new Date().toISOString(),
       corte_caja_bs: totalBs,
       burguer: {
