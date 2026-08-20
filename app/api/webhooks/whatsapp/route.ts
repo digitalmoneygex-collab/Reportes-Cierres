@@ -193,7 +193,7 @@ export async function POST(request: Request) {
       // Guardar como duplicado pero no contarlo
       await supabaseAdmin.from('pagos_whatsapp').insert({
         message_id:      messageId || null,
-        telefono_emisor: cleanReceptor, // Almacenar el número limpio del receptor como emisor, o extraer del alt
+        telefono_emisor: remoteJid.split('@')[0], // Guardar el número del cliente real
         monto_bs,
         monto_usd:       Number(monto_usd),
         tasa_aplicada:   tasa,
@@ -216,7 +216,7 @@ export async function POST(request: Request) {
     // 9. Insertar pago válido
     const { error: dbError } = await supabaseAdmin.from('pagos_whatsapp').insert({
       message_id:      messageId || null,
-      telefono_emisor: cleanReceptor,
+      telefono_emisor: remoteJid.split('@')[0],
       monto_bs,
       monto_usd:       Number(monto_usd),
       tasa_aplicada:   tasa,

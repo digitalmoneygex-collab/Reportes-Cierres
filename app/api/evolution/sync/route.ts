@@ -145,7 +145,7 @@ export async function POST(request: Request) {
 
       await supabaseAdmin.from('pagos_whatsapp').insert({
         message_id:      messageId,
-        telefono_emisor: cleanReceptor,
+        telefono_emisor: msg.key.remoteJid?.split('@')[0] || 'Desconocido',
         monto_bs,
         monto_usd:       Number(monto_usd),
         tasa_aplicada:   tasa,
