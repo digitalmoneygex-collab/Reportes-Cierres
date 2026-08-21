@@ -52,31 +52,35 @@ export default function ConciliacionPage() {
   const [processing, setProcessing] = useState<Record<string, boolean>>({});
   const [toast, setToast]           = useState('');
   const [isSupervisor, setIsSupervisor] = useState(false);
+  const [turnoActivo, setTurnoActivo] = useState<any>(null);
+  const [turnoLoaded, setTurnoLoaded] = useState(false);
 
   useEffect(() => {
     fetch('/api/turnos')
       .then(r => r.json())
       .then(d => {
         if (d.perfil && d.perfil.rol === 'SUPERVISOR') setIsSupervisor(true);
+        if (d.active && d.turno) setTurnoActivo(d.turno);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setTurnoLoaded(true));
   }, []);
 
   // ── Cargar facturas ─────────────────────────────────────────────────────────
-  const load = useCallback(async (d: string) => {
+  const load = useCallback(async (d: string, currentTurno?: any) => {
     setLoading(true);
     setError('');
     setNoTable(false);
     try {
-      // Si d está vacío (primera carga), dejar que la API resuelva la fecha operativa
-      const url = d ? `/api/conciliacion?date=${d}` : '/api/conciliacion';
+      let url = d ? `/api/conciliacion?date=${d}` : '/api/conciliacion';
+      if (!d && currentTurno) {
+        url += `?abierto_at=${encodeURIComponent(currentTurno.abierto_at)}`;
+      }
       const res  = await fetch(url, { cache: 'no-store' });
       const data = await res.json();
       if (data.ok) {
         setFacturas(data.facturas);
-        // La API devuelve la fecha resuelta (respetando ventana 6am)
         if (data.fecha && !d) setFecha(data.fecha);
-        // Pre-cargar selects con el método ya guardado (si existe)
         const init: Record<string, string> = {};
         data.facturas.forEach((f: Factura) => {
           if (f.metodo_pago) init[f.id] = f.metodo_pago;
@@ -94,10 +98,15 @@ export default function ConciliacionPage() {
     }
   }, []);
 
-  // Primera carga: sin fecha para que la API resuelva la ventana operativa
-  useEffect(() => { load(''); }, [load]);
+  // Primera carga: espera a que se resuelva el turno
+  useEffect(() => { 
+    if (turnoLoaded) load('', turnoActivo); 
+  }, [turnoLoaded, turnoActivo, load]);
+
   // Recargar cuando el usuario cambia la fecha manualmente
-  useEffect(() => { if (fecha) load(fecha); }, [fecha, load]);
+  useEffect(() => { 
+    if (fecha && turnoLoaded) load(fecha); 
+  }, [fecha, turnoLoaded, load]);
 
   // ── Procesar factura ────────────────────────────────────────────────────────
   const procesar = async (id: string) => {

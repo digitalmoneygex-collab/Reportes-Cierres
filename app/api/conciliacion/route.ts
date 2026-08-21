@@ -31,21 +31,32 @@ async function resolveBusinessDate(dateParam: string | null): Promise<string> {
   return `${y}-${m}-${d}`;
 }
 
-// GET /api/conciliacion?date=YYYY-MM-DD
+// GET /api/conciliacion?date=YYYY-MM-DD or ?abierto_at=...
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const dateParam = searchParams.get('date');
+    const abierto_at = searchParams.get('abierto_at');
     const targetDate = await resolveBusinessDate(dateParam);
 
-    const { data, error } = await supabaseAdmin
-      .from('pskloud_facturas')
-      .select('*')
-      .eq('fecha', targetDate)
-      .order('documento', { ascending: true });
+    let query = supabaseAdmin.from('pskloud_facturas').select('*');
+
+    if (abierto_at) {
+      const start = new Date(abierto_at);
+      const end = new Date(); // hasta ahora
+      query = query
+        .gte('fechayhora', start.toISOString())
+        .lte('fechayhora', end.toISOString())
+        .order('documento', { ascending: true });
+    } else {
+      query = query
+        .eq('fecha', targetDate)
+        .order('documento', { ascending: true });
+    }
+
+    const { data, error } = await query;
 
     if (error) {
-      // Si la tabla no existe aún, devolver mensaje claro
       if (error.code === '42P01') {
         return NextResponse.json({
           ok: false,

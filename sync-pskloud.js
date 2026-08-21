@@ -88,7 +88,6 @@ const n = (s) => String(s ?? '').trim().toUpperCase();
 
 function normalizarNombre(nombre) {
   let nom = n(nombre);
-  nom = nom.replace(/|/g, 'Ñ');
   nom = nom.replace(/TEQUE.O/g, 'TEQUEÑO');
   nom = nom.replace(/PEQUE.A/g, 'PEQUEÑA');
   return nom;
