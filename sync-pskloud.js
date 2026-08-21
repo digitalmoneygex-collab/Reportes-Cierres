@@ -180,7 +180,7 @@ async function sync() {
       `SELECT COALESCE(SUM(monto), 0) AS total_dev
        FROM operclit
        WHERE DATE(fecha) = ?
-         AND tipodoc = 'DEV'`,
+         AND tipodoc IN ('DEV', 'N/C')`,
       [today]
     );
     const devolucionesEfectivoBs = Number(devRow?.total_dev ?? 0);
@@ -271,7 +271,7 @@ async function sync() {
            oc.tipodoc    AS tipo_doc
          FROM operclit oc
          WHERE DATE(oc.fecha) = ?
-           AND oc.tipodoc IN ('FAC','DEV')
+           AND oc.tipodoc IN ('FAC','DEV','N/C')
          ORDER BY ${selectDoc}`,
         [today]
       );

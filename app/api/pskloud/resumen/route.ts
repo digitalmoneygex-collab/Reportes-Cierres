@@ -113,7 +113,10 @@ export async function GET(request: Request) {
       metodosPago: (facturasResult.data ?? []).reduce((acc: any, curr) => {
         if (!curr.metodo_pago) return acc;
         const exists = acc.find((m: any) => m.metodo === curr.metodo_pago);
-        const monto = curr.tipo_doc === 'DEV' ? -Number(curr.monto_bs) : Number(curr.monto_bs);
+        
+        const isNegative = curr.tipo_doc === 'DEV' || curr.tipo_doc === 'N/C' || curr.metodo_pago === 'devolucion';
+        const monto = isNegative ? -Math.abs(Number(curr.monto_bs)) : Math.abs(Number(curr.monto_bs));
+
         if (exists) {
           exists.cantidad += 1;
           exists.totalBs += monto;
