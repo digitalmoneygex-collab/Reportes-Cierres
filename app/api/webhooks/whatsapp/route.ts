@@ -134,7 +134,7 @@ export async function POST(request: Request) {
 
     // 4. Determinar si es imagen o texto (comprobante)
     const isImage = !!messageContent?.imageMessage;
-    const textMsg = messageContent?.conversation || messageContent?.extendedTextMessage?.text || '';
+    const textMsg = messageContent?.conversation || (messageContent?.extendedTextMessage as any)?.text || '';
     
     const textLower = textMsg.toLowerCase();
     const isReceiptText = !isImage && textMsg && (

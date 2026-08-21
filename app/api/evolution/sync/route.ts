@@ -87,7 +87,7 @@ export async function POST(request: Request) {
       if (cleanReceptor && !jid.includes(cleanReceptor)) return false;
       
       const isImage = !!msg.message?.imageMessage;
-      const textMsg = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
+      const textMsg = msg.message?.conversation || (msg.message?.extendedTextMessage as any)?.text || '';
       const textLower = textMsg.toLowerCase();
       const isReceiptText = !isImage && textMsg && (
         (textLower.includes('referencia') || textLower.includes('ref')) && 
@@ -123,7 +123,7 @@ export async function POST(request: Request) {
       if (existing) { duplicados++; continue; }
 
       const isImage = !!msg.message?.imageMessage;
-      const textMsg = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
+      const textMsg = msg.message?.conversation || (msg.message?.extendedTextMessage as any)?.text || '';
 
       // Descargar imagen solo si es imagen
       let base64 = null;
