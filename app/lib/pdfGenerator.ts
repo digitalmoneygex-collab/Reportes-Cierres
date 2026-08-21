@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 // Tipos para los datos que esperamos del modal / API
 export type ShiftPdfData = {
@@ -79,8 +79,7 @@ export function generateShiftReportPdf(data: ShiftPdfData) {
   }
   finData.push(['Total Neto', fmtBs(data.pskloud.totalRecibidoBs), data.pskloud.tasa > 0 ? fmtUsd(data.pskloud.totalRecibidoUsd) : '-']);
 
-  // @ts-ignore
-  doc.autoTable({
+  autoTable(doc, {
     startY: y,
     head: [['Concepto', 'Monto (Bs)', 'Monto (USD)']],
     body: finData,
@@ -112,8 +111,7 @@ export function generateShiftReportPdf(data: ShiftPdfData) {
     data.pskloud.tasa > 0 ? fmtUsd(totalVentasBs / data.pskloud.tasa) : '-'
   ]);
 
-  // @ts-ignore
-  doc.autoTable({
+  autoTable(doc, {
     startY: y,
     head: [['Método / Vía', 'Cant.', 'Total (Bs)', 'Total (USD)']],
     body: metodosData,
@@ -130,15 +128,14 @@ export function generateShiftReportPdf(data: ShiftPdfData) {
   doc.text('3. PAGOS MÓVILES (BOT)', 15, y);
   y += 6;
   
-  // @ts-ignore
-  doc.autoTable({
+  autoTable(doc, {
     startY: y,
     head: [['Total Capturas Registradas', 'Capturas Procesadas (OCR)', 'Monto Registrado (Bs)', 'Monto Registrado (USD)']],
     body: [[
-      data.pagos.registradosCount.toString(),
-      data.pagos.procesadosCount.toString(),
-      fmtBs(data.pagos.totalBs),
-      data.pskloud.tasa > 0 ? fmtUsd(data.pagos.totalBs / data.pskloud.tasa) : '-'
+      data.pagos.registradosCount?.toString() || '0',
+      data.pagos.procesadosCount?.toString() || '0',
+      fmtBs(data.pagos.totalBs || 0),
+      data.pskloud.tasa > 0 ? fmtUsd((data.pagos.totalBs || 0) / data.pskloud.tasa) : '-'
     ]],
     theme: 'grid',
     headStyles: { fillColor: [40, 160, 100] },
@@ -154,15 +151,14 @@ export function generateShiftReportPdf(data: ShiftPdfData) {
   y += 6;
 
   const drawGroupTable = (title: string, items: {nombre: string, cantidad: number}[], startY: number) => {
-    if (items.length === 0) return startY;
+    if (!items || items.length === 0) return startY;
     let currentY = startY;
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.text(title, 15, currentY);
     currentY += 4;
     
-    // @ts-ignore
-    doc.autoTable({
+    autoTable(doc, {
       startY: currentY,
       head: [['Artículo', 'Cant.']],
       body: items.map(i => [i.nombre, i.cantidad.toString()]),

@@ -238,18 +238,23 @@ export default function ShiftPreviewModal({
                   onClick={() => {
                     // Generar PDF y Descargar
                     if (data) {
-                      generateShiftReportPdf({
-                        fecha: new Date(data.rango.start).toLocaleDateString('es-VE'),
-                        horaApertura: new Date(data.rango.start).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }),
-                        horaCierre: data.rango.end ? new Date(data.rango.end).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }),
-                        cajeroNombre: data.cajero?.nombre || 'CAJERO DESCONOCIDO',
-                        cajeroCedula: data.cajero?.cedula || 'V-00000000',
-                        supervisorNombre: supervisorName,
-                        pskloud: data.pskloud,
-                        metodosPago: data.metodosPago,
-                        pagos: data.pagos,
-                        articulos: data.articulos
-                      });
+                      try {
+                        generateShiftReportPdf({
+                          fecha: new Date(data.rango.start).toLocaleDateString('es-VE'),
+                          horaApertura: new Date(data.rango.start).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }),
+                          horaCierre: data.rango.end ? new Date(data.rango.end).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }),
+                          cajeroNombre: data.cajero?.nombre || 'CAJERO DESCONOCIDO',
+                          cajeroCedula: data.cajero?.cedula || 'V-00000000',
+                          supervisorNombre: supervisorName,
+                          pskloud: data.pskloud,
+                          metodosPago: data.metodosPago || [],
+                          pagos: data.pagos || { totalBs: 0, registradosCount: 0, procesadosCount: 0 },
+                          articulos: data.articulos || { burguer: [], pasteles: [], reposteria: [] }
+                        });
+                      } catch (err) {
+                        console.error('Error generando PDF:', err);
+                        alert('El turno se cerró, pero hubo un error generando el PDF.');
+                      }
                     }
                     onConfirm();
                     onClose();
