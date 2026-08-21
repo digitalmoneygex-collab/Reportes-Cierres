@@ -61,8 +61,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: 'Respuesta inválida o vacía de Evolution API' });
     }
 
-    // 3. Filtrar: solo imágenes, dentro del rango horario Venezuela y del receptor
-    const todayVZ = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Caracas' }); // YYYY-MM-DD
+    // 3. Verificar última sincronización del día (smart sync: no reprocesar desde cero)
+    const todayVZ = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Caracas' });
+    const todayStart = new Date(`${todayVZ}T00:00:00.000-04:00`);
+
+    const { data: lastRecord } = await supabaseAdmin
+      .from('pagos_whatsapp')
+      .select('created_at, message_id')
+      .gte('created_at', todayStart.toISOString())
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // Si ya hay registros del día, solo procesar mensajes POSTERIORES al último
+    const lastSyncedAt = lastRecord?.created_at ? new Date(lastRecord.created_at) : null;
+    if (lastSyncedAt) {
+      console.log(`[Sync] Úlitma sync: ${lastSyncedAt.toISOString()} — procesando solo mensajes nuevos`);
+    } else {
+      console.log(`[Sync] Sin registros previos hoy — procesando todo el día`);
+    }
+
+    // 4. Filtrar: solo imágenes, dentro del rango horario Venezuela y del receptor
     const eligible = messages.filter(msg => {
       const jid = (msg.key.remoteJid || '') + (msg.key.remoteJidAlt || '');
       if (cleanReceptor && !jid.includes(cleanReceptor)) return false;
@@ -72,6 +91,8 @@ export async function POST(request: Request) {
       // Solo mensajes de hoy en Venezuela
       const msgDayVZ = msgDate.toLocaleDateString('en-CA', { timeZone: 'America/Caracas' });
       if (msgDayVZ !== todayVZ) return false;
+      // Smart sync: si ya hay datos previos, solo procesar mensajes posteriores al último
+      if (lastSyncedAt && msgDate <= lastSyncedAt) return false;
       return inRange(msgDate, startTime, endTime);
     });
 
@@ -145,7 +166,7 @@ export async function POST(request: Request) {
 
       await supabaseAdmin.from('pagos_whatsapp').insert({
         message_id:      messageId,
-        telefono_emisor: msg.key.remoteJid?.split('@')[0] || 'Desconocido',
+        telefono_emisor: extractedData.telefono_emisor || '0000000000', // OCR: '0000000000' si no aparece en la imagen
         monto_bs,
         monto_usd:       Number(monto_usd),
         tasa_aplicada:   tasa,
@@ -164,6 +185,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       resumen: { total: eligible.length, procesados, duplicados, errores },
+      lastSyncedAt: lastSyncedAt?.toISOString() ?? null,
+      smartSync: !!lastSyncedAt,
       errorDetails
     });
   } catch (err: unknown) {

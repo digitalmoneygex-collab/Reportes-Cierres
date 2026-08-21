@@ -22,7 +22,7 @@ type QrData = {
   error?: string;
 };
 
-type SyncResult = { procesados: number; duplicados: number; errores: number; total: number; errorDetails?: string[] } | null;
+type SyncResult = { procesados: number; duplicados: number; errores: number; total: number; errorDetails?: string[]; smartSync?: boolean; lastSyncedAt?: string | null } | null;
 
 export default function ConexionPage() {
   const [instance, setInstance] = useState<WaInstance | null>(null);
@@ -72,7 +72,7 @@ export default function ConexionPage() {
     try {
       const res  = await fetch('/api/evolution/sync', { method: 'POST', cache: 'no-store' });
       const data = await res.json();
-      if (data.ok) setSyncResult({ ...data.resumen, errorDetails: data.errorDetails });
+      if (data.ok) setSyncResult({ ...data.resumen, errorDetails: data.errorDetails, smartSync: data.smartSync, lastSyncedAt: data.lastSyncedAt });
       else setApiError(data.error ?? 'Error en sincronización');
     } catch (e: unknown) {
       setApiError(e instanceof Error ? e.message : 'Error de red');
@@ -195,6 +195,15 @@ export default function ConexionPage() {
               {syncResult && (
                 <div style={{ width: '100%', padding: '10px 14px', background: 'rgba(52,211,153,0.07)', border: '1px solid rgba(52,211,153,0.15)', borderRadius: '10px', textAlign: 'left' }}>
                   <p style={{ fontSize: '12px', fontWeight: '700', color: '#34d399', marginBottom: '6px' }}>✅ Sincronización completa</p>
+                  {/* Smart sync info */}
+                  {syncResult.smartSync && syncResult.lastSyncedAt && (
+                    <p style={{ fontSize: '10px', color: '#818cf8', marginBottom: '6px', background: 'rgba(99,102,241,0.1)', padding: '3px 8px', borderRadius: '4px' }}>
+                      ⚡ Continuando desde: {new Date(syncResult.lastSyncedAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} — solo mensajes nuevos
+                    </p>
+                  )}
+                  {!syncResult.smartSync && (
+                    <p style={{ fontSize: '10px', color: '#64748b', marginBottom: '6px' }}>📋 Escaneo completo del día</p>
+                  )}
                   <p style={{ fontSize: '11px', color: '#94a3b8' }}>✔ Procesados: <strong style={{color:'#e8edf5'}}>{syncResult.procesados}</strong></p>
                   <p style={{ fontSize: '11px', color: '#94a3b8' }}>⚠ Duplicados: <strong style={{color:'#fbbf24'}}>{syncResult.duplicados}</strong></p>
                   <p style={{ fontSize: '11px', color: '#94a3b8' }}>✖ Errores: <strong style={{color:'#f87171'}}>{syncResult.errores}</strong></p>

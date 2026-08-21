@@ -20,7 +20,7 @@ export async function readPaymentReceiptImage(base64Image: string) {
         role: 'user',
         parts: [
           {
-            text: `Analiza esta imagen de comprobante de pago venezolano (puede ser un screenshot o una foto de una pantalla). Extrae estos campos en JSON puro: {"monto_bs": number|null, "referencia": string|null, "banco_origen": string|null, "metodo": "pago_movil"|"transferencia"|"otro", "telefono_emisor": string|null, "observaciones": string|null}. Si es foto de pantalla, haz tu mejor esfuerzo por leer los datos. Si no encuentras un campo, usa null. Responde solo JSON sin formato markdown adicional.`
+            text: `Analiza esta imagen de comprobante de pago venezolano (puede ser un screenshot o una foto de una pantalla). Extrae estos campos en JSON puro: {"monto_bs": number|null, "referencia": string|null, "banco_origen": string|null, "metodo": "pago_movil"|"transferencia"|"otro", "telefono_emisor": string|null, "observaciones": string|null}. REGLAS IMPORTANTES: (1) Si NO ves claramente un número de teléfono en la imagen, devuelve "telefono_emisor": "0000000000" — NUNCA inventes ni supongas un teléfono. (2) Si es foto de pantalla, haz tu mejor esfuerzo por leer los datos. (3) Si no encuentras un campo, usa null excepto telefono_emisor que usa "0000000000". (4) Responde solo JSON sin formato markdown adicional.`
           },
           {
             inlineData: {
