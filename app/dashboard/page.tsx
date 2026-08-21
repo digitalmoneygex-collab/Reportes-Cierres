@@ -79,9 +79,9 @@ export default function DashboardPage() {
 
   const loadPagos = useCallback(async (dateFilter?: string, currentTurno?: Turno) => {
     try {
-      let qs = dateFilter ? `&date=${dateFilter}` : '';
-      if (!dateFilter && currentTurno) qs += `&abierto_at=${currentTurno.abierto_at}`;
-      const res = await fetch(`/api/pagos?limit=50${qs}`, { cache: 'no-store' });
+      let qs = dateFilter ? `?date=${dateFilter}` : '';
+      if (!dateFilter && currentTurno) qs = `?abierto_at=${encodeURIComponent(currentTurno.abierto_at)}`;
+      const res = await fetch(`/api/pagos${qs ? qs + '&limit=50' : '?limit=50'}`, { cache: 'no-store' });
       const json = await res.json();
       if (json.ok && json.data) {
         const fresh = json.data as Pago[];
@@ -105,7 +105,7 @@ export default function DashboardPage() {
   const loadPskloud = useCallback(async (dateFilter?: string, currentTurno?: Turno) => {
     try {
       let qs = dateFilter ? `?date=${dateFilter}` : '';
-      if (!dateFilter && currentTurno) qs += `?abierto_at=${currentTurno.abierto_at}`;
+      if (!dateFilter && currentTurno) qs = `?abierto_at=${encodeURIComponent(currentTurno.abierto_at)}`;
       const res = await fetch(`/api/pskloud/resumen${qs}`, { cache: 'no-store' });
       const json = await res.json();
       if (json.ok) setPskloudData(json);
