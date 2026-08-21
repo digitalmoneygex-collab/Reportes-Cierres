@@ -51,7 +51,7 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} style={S.form}>
           <div style={S.field}>
-            <label htmlFor="login-user" style={S.label}>Usuario</label>
+            <label htmlFor="login-user" style={S.label}>Cédula</label>
             <div style={S.inputWrap}>
               <span style={S.inputIcon}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -64,7 +64,7 @@ export default function LoginPage() {
                 className="input"
                 style={{ paddingLeft: '40px' }}
                 type="text"
-                placeholder="admin"
+                placeholder="Ej: 24500123"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required

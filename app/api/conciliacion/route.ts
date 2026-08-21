@@ -64,11 +64,42 @@ export async function GET(request: Request) {
 }
 
 
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+
+async function getSupabase() {
+  const cookieStore = cookies();
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) { return cookieStore.get(name)?.value; },
+        set(name: string, value: string, options: CookieOptions) { },
+        remove(name: string, options: CookieOptions) { },
+      },
+    }
+  );
+}
+
 // PATCH /api/conciliacion
 // Body: { id: string, metodo_pago: string }
-// Procesa una factura: la marca como procesada e inmutable
+// Procesa una factura: la marca como procesada. Supervisor puede re-procesar.
 export async function PATCH(request: Request) {
   try {
+    const supabaseUser = await getSupabase();
+    const { data: { user } } = await supabaseUser.auth.getUser();
+    
+    let isSupervisor = false;
+    if (user) {
+      const { data: perfil } = await supabaseUser
+        .from('usuarios')
+        .select('rol')
+        .eq('id', user.id)
+        .single();
+      if (perfil?.rol === 'SUPERVISOR') isSupervisor = true;
+    }
+
     const body = await request.json();
     const { id, metodo_pago } = body;
 
@@ -87,8 +118,8 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ ok: false, error: 'Factura no encontrada' }, { status: 404 });
     }
 
-    if (existing.procesado) {
-      return NextResponse.json({ ok: false, error: 'Esta factura ya fue procesada y no puede modificarse' }, { status: 409 });
+    if (existing.procesado && !isSupervisor) {
+      return NextResponse.json({ ok: false, error: 'Esta factura ya fue procesada y no puede modificarse por un cajero' }, { status: 409 });
     }
 
     // Marcar como procesada

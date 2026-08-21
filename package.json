@@ -9,8 +9,12 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@ducanh2912/next-pwa": "^10.2.9",
     "@google/generative-ai": "^0.21.0",
+    "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.3",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "mysql2": "^3.23.3",
     "next": "14.2.15",
     "react": "18.3.1",

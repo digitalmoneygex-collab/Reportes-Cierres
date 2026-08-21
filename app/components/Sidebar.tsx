@@ -62,14 +62,17 @@ const NAV = [
 ];
 
 type WaState = 'open' | 'connecting' | 'offline' | 'checking';
+type UserProfile = { nombre_completo: string; rol: string } | null;
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [waState, setWaState] = useState<WaState>('checking');
+  const [user, setUser] = useState<UserProfile>(null);
 
   useEffect(() => {
-    const check = async () => {
+    // Check WhatsApp
+    const checkWa = async () => {
       try {
         const res = await fetch('/api/evolution/status', { cache: 'no-store', signal: AbortSignal.timeout(8000) });
         const data = await res.json();
@@ -79,9 +82,23 @@ export default function Sidebar() {
         setWaState('offline');
       }
     };
-    check();
-    const id = setInterval(check, 12000);
+    checkWa();
+    const id = setInterval(checkWa, 12000);
     return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    // Fetch user profile
+    const fetchUser = async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        const data = await res.json();
+        if (data.ok && data.user) {
+          setUser(data.user);
+        }
+      } catch (err) {}
+    };
+    fetchUser();
   }, []);
 
   const handleLogout = async () => {
@@ -120,16 +137,19 @@ export default function Sidebar() {
         {/* Nav */}
         <nav style={S.nav}>
           <div style={S.navSection}>MENÚ</div>
-          {NAV.map(({ href, label, icon }) => {
-            const active = pathname === href;
+          {NAV.map((item) => {
+            if (item.href === '/configuracion' && user?.rol !== 'SUPERVISOR') {
+              return null;
+            }
+            const active = pathname === item.href;
             return (
               <Link
-                key={href}
-                href={href}
+                key={item.href}
+                href={item.href}
                 style={active ? { ...S.navItem, ...S.navActive } : S.navItem}
               >
-                <span style={{ color: active ? '#818cf8' : '#475569', display: 'flex' }}>{icon}</span>
-                <span>{label}</span>
+                <span style={{ color: active ? '#818cf8' : '#475569', display: 'flex' }}>{item.icon}</span>
+                <span>{item.label}</span>
                 {active && <span style={S.navDot} />}
               </Link>
             );
@@ -138,10 +158,10 @@ export default function Sidebar() {
 
         {/* Footer */}
         <div style={S.footer}>
-          <div style={S.avatar}>A</div>
+          <div style={S.avatar}>{user?.nombre_completo?.[0] || 'A'}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={S.userName}>Administrador</div>
-            <div style={S.userRole}>GEX System</div>
+            <div style={S.userName}>{user?.nombre_completo || 'Cargando...'}</div>
+            <div style={S.userRole}>{user?.rol === 'SUPERVISOR' ? 'Supervisor' : user?.rol === 'CAJERO' ? 'Cajero' : 'GEX System'}</div>
           </div>
           <button onClick={handleLogout} style={S.logoutBtn} title="Cerrar sesión" aria-label="Cerrar sesión">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">

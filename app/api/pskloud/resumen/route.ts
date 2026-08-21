@@ -2,20 +2,24 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getTasaDelDia } from '@/lib/tasa';
 
-// GET /api/pskloud/resumen
-// Lee el snapshot más reciente subido por sync-pskloud.js local
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const dateParam = searchParams.get('date'); // YYYY-MM-DD
+    const abierto_at = searchParams.get('abierto_at');
+    const cerrado_at = searchParams.get('cerrado_at');
+    const dateParam = searchParams.get('date');
 
     let start: Date;
     let end: Date;
 
-    if (dateParam) {
+    if (abierto_at) {
+      start = new Date(abierto_at);
+      end = cerrado_at ? new Date(cerrado_at) : new Date(); // Si está activo, hasta ahora
+    } else if (dateParam) {
       start = new Date(`${dateParam}T00:00:00.000-04:00`);
       end = new Date(`${dateParam}T23:59:59.999-04:00`);
     } else {
+      // Legacy / Fallback
       const { data: config } = await supabaseAdmin.from('configuracion').select('start_time').eq('id', 1).single();
       const startTime = config?.start_time || '06:00';
       
@@ -46,98 +50,117 @@ export async function GET(request: Request) {
       end = new Date(end.getTime() - 1);
     }
 
-    // Buscar el snapshot más reciente dentro del rango lógico del día
-    const [{ data, error }, tasaResult, facturasResult] = await Promise.all([
-      supabaseAdmin
-        .from('pskloud_snapshot')
-        .select('*')
-        .gte('synced_at', start.toISOString())
-        .lte('synced_at', end.toISOString())
-        .order('synced_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      getTasaDelDia().catch(() => 0), // Si falla la tasa, usar 0 sin romper el route
+    const [tasaResult, facturasResult, articulosResult] = await Promise.all([
+      getTasaDelDia().catch(() => 0),
       supabaseAdmin
         .from('pskloud_facturas')
-        .select('metodo_pago, monto_bs, tipo_doc')
-        .gte('procesado_at', start.toISOString())
-        .lte('procesado_at', end.toISOString())
-        .eq('procesado', true)
+        .select('*')
+        .gte('fechayhora', start.toISOString())
+        .lte('fechayhora', end.toISOString()),
+      supabaseAdmin
+        .from('pskloud_articulos')
+        .select('*')
+        .gte('fechayhora', start.toISOString())
+        .lte('fechayhora', end.toISOString())
     ]);
 
-    if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-    }
+    if (facturasResult.error) throw new Error(facturasResult.error.message);
+    if (articulosResult.error) throw new Error(articulosResult.error.message);
 
-    if (!data) {
-      return NextResponse.json({
-        ok: false,
-        error: 'Sin datos PSKLOUD. Ejecuta: node sync-pskloud.js en la PC local.',
-        noData: true,
+    const facturas = facturasResult.data || [];
+    const articulos = articulosResult.data || [];
+
+    // Calcular Totales
+    let totalBs = 0;
+    let devolucionesEfBs = 0;
+
+    facturas.forEach(f => {
+      const isNeg = f.tipo_doc === 'DEV' || f.tipo_doc === 'N/C' || f.tipo_doc === 'NC';
+      const m = Number(f.monto_bs) || 0;
+      if (isNeg) {
+        devolucionesEfBs += m;
+      } else {
+        totalBs += m;
+      }
+    });
+
+    const totalRecibidoBs = totalBs - devolucionesEfBs;
+    const tasa = Number(tasaResult ?? 0);
+    const totalBsUsd = tasa > 0 ? totalBs / tasa : 0;
+    const devolucionesEfUsd = tasa > 0 ? devolucionesEfBs / tasa : 0;
+    const totalRecibidoUsd = tasa > 0 ? totalRecibidoBs / tasa : 0;
+
+    // Métodos de Pago Conciliados
+    const metodosPago = facturas.filter(f => f.procesado).reduce((acc: any, curr) => {
+      if (!curr.metodo_pago) return acc;
+      let metodoPagoReal = curr.metodo_pago;
+      let isDevolucionManual = false;
+
+      if (curr.metodo_pago.startsWith('dev_')) {
+        metodoPagoReal = curr.metodo_pago.replace('dev_', '');
+        isDevolucionManual = true;
+      }
+
+      const exists = acc.find((m: any) => m.metodo === metodoPagoReal);
+      const isNegative = curr.tipo_doc === 'DEV' || curr.tipo_doc === 'N/C' || curr.tipo_doc === 'NC' || isDevolucionManual || curr.metodo_pago === 'devolucion' || curr.metodo_pago === 'gasto';
+      const monto = isNegative ? -Math.abs(Number(curr.monto_bs)) : Math.abs(Number(curr.monto_bs));
+
+      if (exists) {
+        exists.cantidad += 1;
+        exists.totalBs += monto;
+      } else {
+        acc.push({ metodo: metodoPagoReal, cantidad: 1, totalBs: monto });
+      }
+      return acc;
+    }, []);
+
+    // Agrupar Articulos
+    const agruparArticulos = (cat: string) => {
+      const filtrados = articulos.filter(a => a.categoria === cat);
+      const map = new Map<string, number>();
+      filtrados.forEach(a => {
+        map.set(a.nombre, (map.get(a.nombre) || 0) + Number(a.cantidad));
       });
-    }
+      return Array.from(map.entries()).map(([nombre, cantidad]) => ({ nombre, cantidad }));
+    };
 
-    // Verificar que el snapshot sea del día de hoy (Venezuela) o de las últimas 24h
-    const syncedAt  = new Date(data.synced_at);
-    const hoursAgo  = (Date.now() - syncedAt.getTime()) / (1000 * 60 * 60);
-    const isRecent  = hoursAgo < 24;
-
-    const tasa               = Number(tasaResult ?? 0);
-    const totalBs             = Number(data.corte_caja_bs ?? 0);           // Total Ingresos (bruto)
-    const devolucionesEfBs    = Number(data.devoluciones_efectivo_bs ?? 0); // Devoluc. Efect.(-)
-    const totalRecibidoBs     = Number(data.total_recibido_bs ?? totalBs);  // TOTAL RECIBIDO
-
-    // Conversiones USD
-    const totalBsUsd          = tasa > 0 ? totalBs / tasa : 0;
-    const devolucionesEfUsd   = tasa > 0 ? devolucionesEfBs / tasa : 0;
-    const totalRecibidoUsd    = tasa > 0 ? totalRecibidoBs / tasa : 0;
+    const reposteriaItems = agruparArticulos('reposteria');
+    const reposteriaTotal = reposteriaItems.reduce((acc, i) => acc + i.cantidad, 0);
 
     return NextResponse.json({
       ok: true,
-      synced_at: data.synced_at,
-      is_recent: isRecent,
+      synced_at: new Date().toISOString(),
+      is_recent: true,
       corteCaja: {
-        // Total Ingresos (corte_caja_bs)
         totalBs,
         totalBsUsd,
-        // Devoluciones en efectivo
         devolucionesEfBs,
         devolucionesEfUsd,
-        // TOTAL RECIBIDO = lo que se muestra como "Ventas Sistema"
         totalRecibidoBs,
         totalRecibidoUsd,
         tasa,
-        // Alias legacy para compatibilidad
         totalUsd: totalRecibidoUsd,
       },
-      metodosPago: (facturasResult.data ?? []).reduce((acc: any, curr) => {
-        if (!curr.metodo_pago) return acc;
-        
-        let metodoPagoReal = curr.metodo_pago;
-        let isDevolucionManual = false;
-
-        if (curr.metodo_pago.startsWith('dev_')) {
-          metodoPagoReal = curr.metodo_pago.replace('dev_', '');
-          isDevolucionManual = true;
-        }
-
-        const exists = acc.find((m: any) => m.metodo === metodoPagoReal);
-        
-        const isNegative = curr.tipo_doc === 'DEV' || curr.tipo_doc === 'N/C' || curr.tipo_doc === 'NC' || isDevolucionManual || curr.metodo_pago === 'devolucion';
-        const monto = isNegative ? -Math.abs(Number(curr.monto_bs)) : Math.abs(Number(curr.monto_bs));
-
-        if (exists) {
-          exists.cantidad += 1;
-          exists.totalBs += monto;
-        } else {
-          acc.push({ metodo: metodoPagoReal, cantidad: 1, totalBs: monto });
-        }
-        return acc;
-      }, []),
-      burguer:    data.burguer,
-      pasteles:   data.pasteles,
-      tequeños:   data.teques,
-      reposteria: data.reposteria,
+      metodosPago,
+      burguer: {
+        combosHamb: [], // En esta iteración simplificada mandamos los items raw al PskloudPanel
+        hambSueltas: agruparArticulos('burguer'),
+        perros: [],
+        otros: [],
+        totalesInsumos: {}
+      },
+      pasteles: {
+        pasapalos: [],
+        pequenos: agruparArticulos('pasteles'),
+        empanadas: [],
+        grandes: [],
+        otros: [],
+        totalesInsumos: {}
+      },
+      reposteria: {
+        items: reposteriaItems,
+        total: reposteriaTotal
+      }
     });
 
   } catch (err: unknown) {

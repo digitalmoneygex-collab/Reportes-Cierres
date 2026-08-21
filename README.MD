@@ -162,7 +162,18 @@ Si quieres, en el siguiente paso te dejo el proyecto real de Next.js ya montado 
 5. **Webhook de WhatsApp Robusto:** El endpoint `/api/webhooks/whatsapp` ahora ignora correctamente mensajes salientes del bot, respeta el horario comercial (06:00 a 00:00) validando contra la hora de Venezuela (UTC-4), e inserta pagos validados en `pagos_whatsapp`.
 
 **⏳ Pendiente por validar (Mañana a las 06:00 AM):**
+
+## ✨ Características Principales
+- **Conexión Directa a PSKLOUD:** Lee en tiempo real (mediante ETL) cortes de caja, artículos vendidos y métodos de pago registrados en el sistema administrativo PSKLOUD (MySQL).
+- **Procesamiento de WhatsApp:** Conecta con Evolution API para recibir capturas de pantalla de transferencias/pagos móviles, procesando los montos mediante OCR (Tesseract.js).
+- **Conciliación Inteligente:** Interfaz para que el cajero empate las capturas de WhatsApp con las facturas del sistema. Bloquea el cierre si existen discrepancias.
+- **Roles y Permisos:** 
+  - **Cajero:** Visualiza su turno actual y concilia pagos.
+  - **Supervisor:** Puede forzar cortes de caja y corregir/editar conciliaciones procesadas por error.
+- **Generación de PDFs Dinámicos:** Crea de forma inmediata reportes imprimibles del cierre de turno con resumen financiero, métodos de pago y conteo de piezas.
+- **Soporte Multimoneda:** Conversión automática USD/Bs usando la Tasa Oficial del BCV.
+- **PWA (Progressive Web App):** Instalable como aplicación de escritorio o móvil para un acceso directo e independiente.
+
 - **Intercepción de nuevas imágenes (Captures):** Debido a que la API de Evolution solo retorna los últimos 50 mensajes en el histórico, los captures enviados durante el fallo del OCR de hoy quedaron inaccesibles para el botón "Sincronizar". 
 - **Acción requerida:** A partir de mañana a las 6:00 AM, las **nuevas** imágenes entrantes deberán ser capturadas en tiempo real por el Webhook sin problemas y reflejarse automáticamente en el panel (`Procesados 1/1`).
 - Mantener ejecutando localmente el script: `node sync-pskloud.js --watch` para que la data del sistema fluya hacia la nube.
-

@@ -25,6 +25,7 @@ const METODOS_PAGO = [
   { value: 'binance',          label: '🟡 Binance' },
   { value: 'zelle',            label: '💸 Zelle' },
   { value: 'bio_pago',         label: '🔵 Bio Pago' },
+  { value: 'gasto',            label: '📉 Gasto' },
   { value: 'dev_punto_venta',      label: '↩️ Dev. Punto de Venta' },
   { value: 'dev_pago_movil',       label: '↩️ Dev. Pago Móvil' },
   { value: 'dev_bs_efectivo',      label: '↩️ Dev. Bs Efectivo' },
@@ -50,6 +51,16 @@ export default function ConciliacionPage() {
   const [selects, setSelects]       = useState<Record<string, string>>({});
   const [processing, setProcessing] = useState<Record<string, boolean>>({});
   const [toast, setToast]           = useState('');
+  const [isSupervisor, setIsSupervisor] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/turnos')
+      .then(r => r.json())
+      .then(d => {
+        if (d.perfil && d.perfil.rol === 'SUPERVISOR') setIsSupervisor(true);
+      })
+      .catch(() => {});
+  }, []);
 
   // ── Cargar facturas ─────────────────────────────────────────────────────────
   const load = useCallback(async (d: string) => {
@@ -90,7 +101,8 @@ export default function ConciliacionPage() {
 
   // ── Procesar factura ────────────────────────────────────────────────────────
   const procesar = async (id: string) => {
-    const metodo = selects[id];
+    const f = facturas.find(fact => fact.id === id);
+    const metodo = selects[id] || f?.metodo_pago;
     if (!metodo) {
       showToast('⚠️ Selecciona un método de pago primero');
       return;
@@ -307,7 +319,7 @@ export default function ConciliacionPage() {
                   </span>
 
                   {/* Método de pago */}
-                  {locked ? (
+                  {locked && !isSupervisor ? (
                     <span style={{
                       fontSize: '12px', fontWeight: '600', color: '#34d399',
                       background: 'rgba(52,211,153,0.1)', padding: '5px 10px',
@@ -317,7 +329,7 @@ export default function ConciliacionPage() {
                     </span>
                   ) : (
                     <select
-                      value={selected}
+                      value={selected || (f.metodo_pago ?? '')}
                       onChange={e => setSelects(prev => ({ ...prev, [f.id]: e.target.value }))}
                       style={{
                         background: 'rgba(15,23,42,0.9)',
@@ -336,7 +348,7 @@ export default function ConciliacionPage() {
                   )}
 
                   {/* Botón Procesar */}
-                  {locked ? (
+                  {locked && !isSupervisor ? (
                     <span style={{ fontSize: '10px', color: '#34d399', fontWeight: '600' }}>
                       ✅ Procesado<br />
                       <span style={{ color: '#2d3748', fontSize: '9px' }}>

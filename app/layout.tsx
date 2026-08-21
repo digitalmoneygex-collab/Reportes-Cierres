@@ -5,10 +5,11 @@ import AppShell from './components/AppShell';
 export const metadata: Metadata = {
   title: 'GEX — Reportes de Cierres',
   description: 'Sistema de cierres diarios · Evolution API + Supabase',
-  themeColor: '#060c18',
+  manifest: '/manifest.json',
 };
 
 export const viewport: Viewport = {
+  themeColor: '#060c18',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,

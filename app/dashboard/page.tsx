@@ -2,129 +2,162 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import PskloudPanel from '@/app/components/PskloudPanel';
+import ShiftPreviewModal from '@/app/components/ShiftPreviewModal';
+import { useRouter } from 'next/navigation';
 
-type Pago = {
-  id: string;
-  created_at: string;
-  telefono_emisor: string;
-  monto_bs: number;
-  monto_usd?: number;
-  referencia: string;
-  banco_origen: string;
-  metodo: string;
-  procesado: boolean;
-};
+type Pago = { id: string; created_at: string; telefono_emisor: string; monto_bs: number; monto_usd?: number; referencia: string; banco_origen: string; metodo: string; procesado: boolean; };
+type WaInstance = { name: string; connectionStatus: string; profileName: string | null; number: string | null; };
+type Turno = { id: number; usuario_id: string; abierto_at: string; cerrado_at: string | null; };
 
-type WaInstance = {
-  name: string;
-  connectionStatus: string;
-  profileName: string | null;
-  number: string | null;
-};
-
-const fmtBs = (v: number) =>
-  new Intl.NumberFormat('es-VE', {
-    style: 'currency',
-    currency: 'VES',
-    maximumFractionDigits: 2,
-  }).format(v ?? 0);
-
-const fmtTime = (iso: string) =>
-  new Date(iso).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
-
-const fmtDate = () =>
-  new Date().toLocaleDateString('es-VE', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
+const fmtBs = (v: number) => new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'VES', maximumFractionDigits: 2 }).format(v ?? 0);
+const fmtDate = () => new Date().toLocaleDateString('es-VE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
 export default function DashboardPage() {
-  const [pagos, setPagos]       = useState<Pago[]>([]);
-  const [waInst, setWaInst]     = useState<WaInstance | null>(null);
-  const [tasa, setTasa]         = useState<number>(0);
-  const [loading, setLoading]   = useState(true);
+  const router = useRouter();
+  const [turno, setTurno] = useState<Turno | null>(null);
+  const [loadingTurno, setLoadingTurno] = useState(true);
+  const [pagos, setPagos] = useState<Pago[]>([]);
+  const [waInst, setWaInst] = useState<WaInstance | null>(null);
+  const [tasa, setTasa] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
   const [pskloudData, setPskloudData] = useState<any>(null);
   const [pskloudLoading, setPskloudLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastUpdate, setLast]   = useState('');
   const [newCount, setNewCount] = useState(0);
   const [selectedDate, setSelectedDate] = useState<string>('');
-  const prevIdsRef              = useRef<Set<string>>(new Set());
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const prevIdsRef = useRef<Set<string>>(new Set());
+
+  const loadTurno = useCallback(async () => {
+    try {
+      const res = await fetch('/api/turnos');
+      const json = await res.json();
+      if (json.ok && json.active) {
+        setTurno(json.turno);
+      } else {
+        setTurno(null);
+      }
+    } catch { }
+    setLoadingTurno(false);
+  }, []);
+
+  const openTurno = async () => {
+    try {
+      const res = await fetch('/api/turnos', { method: 'POST' });
+      const json = await res.json();
+      if (json.ok && json.turno) {
+        setTurno(json.turno);
+      }
+    } catch (e) {
+      alert('Error abriendo turno');
+    }
+  };
+
+  const closeTurno = async () => {
+    try {
+      const res = await fetch('/api/turnos', { 
+        method: 'PUT', 
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setTurno(null);
+        alert('Turno cerrado correctamente');
+      }
+    } catch (e) {
+      alert('Error cerrando turno');
+    }
+  };
 
   const loadTasa = useCallback(async () => {
     try {
-      const res = await fetch('/api/tasa', { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+      const res = await fetch('/api/tasa', { cache: 'no-store' });
       const json = await res.json();
       if (json.ok && json.tasa) setTasa(json.tasa);
-    } catch { /* silent */ }
+    } catch { }
   }, []);
 
-  const loadPagos = useCallback(async (dateFilter?: string) => {
+  const loadPagos = useCallback(async (dateFilter?: string, currentTurno?: Turno) => {
     try {
-      const qs = dateFilter ? `&date=${dateFilter}` : '';
-      const res  = await fetch(`/api/pagos?limit=50${qs}`, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
-      const json = await res.json() as { ok: boolean; data: Pago[] };
+      let qs = dateFilter ? `&date=${dateFilter}` : '';
+      if (!dateFilter && currentTurno) qs += `&abierto_at=${currentTurno.abierto_at}`;
+      const res = await fetch(`/api/pagos?limit=50${qs}`, { cache: 'no-store' });
+      const json = await res.json();
       if (json.ok && json.data) {
-        const fresh = json.data;
-        // detect new rows
+        const fresh = json.data as Pago[];
         const newIds = fresh.filter(p => !prevIdsRef.current.has(p.id));
-        if (prevIdsRef.current.size > 0 && newIds.length > 0) {
-          setNewCount(n => n + newIds.length);
-        }
+        if (prevIdsRef.current.size > 0 && newIds.length > 0) setNewCount(n => n + newIds.length);
         prevIdsRef.current = new Set(fresh.map(p => p.id));
         setPagos(fresh);
-        setLast(new Date().toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       }
-    } catch { /* silent */ }
+    } catch { }
     setLoading(false);
   }, []);
 
   const loadWA = useCallback(async () => {
     try {
-      const res  = await fetch('/api/evolution/status', { cache: 'no-store', signal: AbortSignal.timeout(8000) });
-      const json = await res.json() as { ok: boolean; instances?: WaInstance[] };
+      const res = await fetch('/api/evolution/status', { cache: 'no-store' });
+      const json = await res.json();
       if (json.ok && json.instances?.[0]) setWaInst(json.instances[0]);
-    } catch { /* silent */ }
+    } catch { }
   }, []);
 
-  const loadPskloud = useCallback(async (dateFilter?: string) => {
+  const loadPskloud = useCallback(async (dateFilter?: string, currentTurno?: Turno) => {
     try {
-      const qs = dateFilter ? `?date=${dateFilter}` : '';
-      const res = await fetch(`/api/pskloud/resumen${qs}`, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+      let qs = dateFilter ? `?date=${dateFilter}` : '';
+      if (!dateFilter && currentTurno) qs += `?abierto_at=${currentTurno.abierto_at}`;
+      const res = await fetch(`/api/pskloud/resumen${qs}`, { cache: 'no-store' });
       const json = await res.json();
       if (json.ok) setPskloudData(json);
-    } catch { /* silent */ }
+    } catch { }
     setPskloudLoading(false);
   }, []);
 
   useEffect(() => {
-    loadPagos(selectedDate);
+    loadTurno();
+  }, [loadTurno]);
+
+  useEffect(() => {
+    if (loadingTurno) return;
+    if (!turno && !selectedDate) return;
+
+    loadPagos(selectedDate, turno || undefined);
     loadWA();
     loadTasa();
-    loadPskloud(selectedDate);
+    loadPskloud(selectedDate, turno || undefined);
     
-    // Si hay una fecha seleccionada (historial), no auto-actualizar
     if (selectedDate) return;
 
-    const id1 = setInterval(() => loadPagos(), 10000); // poll every 10s
+    const id1 = setInterval(() => loadPagos(selectedDate, turno || undefined), 10000);
     const id2 = setInterval(() => loadWA(), 15000);
-    const id3 = setInterval(() => loadTasa(), 60000); // poll tasa every 1m
-    const id4 = setInterval(() => loadPskloud(), 60000); // poll pskloud every 1m
+    const id3 = setInterval(() => loadTasa(), 60000);
+    const id4 = setInterval(() => loadPskloud(selectedDate, turno || undefined), 60000);
     return () => { clearInterval(id1); clearInterval(id2); clearInterval(id3); clearInterval(id4); };
-  }, [loadPagos, loadWA, loadTasa, loadPskloud, selectedDate]);
+  }, [loadingTurno, turno, selectedDate, loadPagos, loadWA, loadTasa, loadPskloud]);
 
-  const total     = pagos.reduce((s, p) => s + (p.monto_bs ?? 0), 0);
-  const totalUsd  = tasa > 0 ? (total / tasa) : 0;
+  if (loadingTurno) {
+    return <div style={{ padding: 40, color: '#e8edf5' }}>Cargando turno...</div>;
+  }
+
+  if (!turno && !selectedDate) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '80vh' }}>
+        <h2 style={{ color: '#e8edf5', fontSize: '24px', marginBottom: '8px' }}>No tienes un turno activo</h2>
+        <p style={{ color: '#94a3b8', marginBottom: '24px' }}>Abre tu turno para comenzar a registrar las ventas del sistema.</p>
+        <button className="btn btn-primary" style={{ padding: '12px 24px', fontSize: '16px' }} onClick={openTurno}>
+          Abrir Turno
+        </button>
+      </div>
+    );
+  }
+
+  const total = pagos.reduce((s, p) => s + (p.monto_bs ?? 0), 0);
+  const totalUsd = tasa > 0 ? (total / tasa) : 0;
   const procesados = pagos.filter(p => p.procesado).length;
 
-  const waColor = waInst?.connectionStatus === 'open' ? '#34d399'
-    : waInst?.connectionStatus === 'connecting' ? '#fbbf24' : '#f87171';
-  const waLabel = waInst?.connectionStatus === 'open' ? 'Conectado'
-    : waInst?.connectionStatus === 'connecting' ? 'Conectando…' : 'Desconectado';
+  const waColor = waInst?.connectionStatus === 'open' ? '#34d399' : waInst?.connectionStatus === 'connecting' ? '#fbbf24' : '#f87171';
+  const waLabel = waInst?.connectionStatus === 'open' ? 'Conectado' : waInst?.connectionStatus === 'connecting' ? 'Conectando…' : 'Desconectado';
 
-  // Bar chart data: group by hour
   const byHour = Array.from({ length: 24 }, (_, h) => {
     const slice = pagos.filter(p => new Date(p.created_at).getHours() === h);
     return { hour: h, count: slice.length, total: slice.reduce((s, p) => s + (p.monto_bs ?? 0), 0) };
@@ -133,37 +166,28 @@ export default function DashboardPage() {
 
   return (
     <div className="animate-fade-in">
-      {/* Header */}
+      {turno && (
+        <ShiftPreviewModal 
+          isOpen={previewOpen} 
+          onClose={() => setPreviewOpen(false)} 
+          onConfirm={closeTurno} 
+          start={turno.abierto_at} 
+        />
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <p className="eyebrow" style={{ marginBottom: '4px' }}>{fmtDate()}</p>
           <h1 className="page-title">Dashboard</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '6px', flexWrap: 'wrap' }}>
             <p className="page-subtitle" style={{ margin: 0 }}>
-              {selectedDate ? 'Vista de historial estático' : 'Vista en tiempo real · actualización cada 10 seg'}
+              {selectedDate ? 'Vista de historial' : `Turno Abierto desde: ${new Date(turno!.abierto_at).toLocaleTimeString('es-VE')}`}
             </p>
             {tasa > 0 && (
               <span style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                background: 'linear-gradient(135deg, rgba(251,191,36,0.15) 0%, rgba(245,158,11,0.1) 100%)',
-                border: '1px solid rgba(251,191,36,0.35)',
-                borderRadius: '8px',
-                padding: '4px 12px',
-                fontFamily: 'Inter, sans-serif',
-                fontSize: '13px',
-                fontWeight: '800',
-                color: '#fbbf24',
-                letterSpacing: '-0.01em',
-                boxShadow: '0 0 16px rgba(251,191,36,0.12)',
-                textShadow: '0 0 12px rgba(251,191,36,0.4)',
+                display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'linear-gradient(135deg, rgba(251,191,36,0.15) 0%, rgba(245,158,11,0.1) 100%)',
+                border: '1px solid rgba(251,191,36,0.35)', borderRadius: '8px', padding: '4px 12px', fontSize: '13px', fontWeight: '800', color: '#fbbf24'
               }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="1" x2="12" y2="23"/>
-                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                </svg>
-                Tasa BCV: Bs.&nbsp;{tasa.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                Tasa BCV: Bs. {tasa.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             )}
           </div>
@@ -174,58 +198,21 @@ export default function DashboardPage() {
               +{newCount} nuevo{newCount > 1 ? 's' : ''}
             </button>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(148,163,184,0.1)', padding: '4px 8px', borderRadius: '8px' }}>
-            <span style={{ fontSize: '11px', color: '#475569', fontWeight: '600' }}>Historial:</span>
-            <input 
-              type="date" 
-              className="input" 
-              style={{ padding: '4px 8px', fontSize: '12px', height: 'auto', minHeight: '0', width: '120px', background: 'transparent', border: 'none', color: '#e8edf5' }}
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-            />
-            {selectedDate && (
-              <button 
-                className="btn btn-ghost" 
-                style={{ padding: '4px 8px', fontSize: '11px', height: 'auto', minHeight: '0' }}
-                onClick={() => setSelectedDate('')}
-              >
-                Volver a hoy
-              </button>
-            )}
-          </div>
-          {!selectedDate && (
-            <span style={{ fontSize: '11px', color: '#2d3748' }}>
-              {lastUpdate ? `Actualizado ${lastUpdate}` : 'Cargando…'}
-            </span>
+          
+          <button className="btn btn-ghost btn-sm" disabled={isRefreshing} onClick={async () => {
+            setIsRefreshing(true);
+            try { await Promise.all([loadPagos(selectedDate, turno || undefined), loadWA(), loadTasa(), loadPskloud(selectedDate, turno || undefined)]); } finally { setIsRefreshing(false); }
+          }}>Refrescar</button>
+
+          {!selectedDate && turno && (
+            <button className="btn btn-sm" style={{ background: '#ef4444', color: 'white', border: 'none' }} onClick={() => setPreviewOpen(true)}>
+              Cerrar Turno
+            </button>
           )}
-          <button
-            id="dashboard-refresh"
-            className="btn btn-ghost btn-sm"
-            disabled={isRefreshing}
-            onClick={async () => {
-              setIsRefreshing(true);
-              try {
-                await Promise.all([loadPagos(selectedDate), loadWA(), loadTasa(), loadPskloud(selectedDate)]);
-              } finally {
-                setIsRefreshing(false);
-              }
-            }}
-          >
-            <svg
-              style={{ transition: 'transform 0.6s ease', transform: isRefreshing ? 'rotate(360deg)' : 'rotate(0deg)' }}
-              width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-            >
-              <polyline points="23 4 23 10 17 10"/>
-              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-            </svg>
-            {isRefreshing ? 'Actualizando...' : 'Refrescar'}
-          </button>
         </div>
       </div>
 
-      {/* KPI Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '28px' }}>
-        {/* Total */}
         <div className="card-glow" style={{ background: 'linear-gradient(135deg, #0c1428 0%, #101a2e 100%)' }}>
           <p className="label" style={{ marginBottom: '12px', color: '#475569' }}>Pagos Móviles del Día</p>
           {loading ? <div className="skeleton" style={{ height: '36px', marginBottom: '6px' }} /> : (
@@ -234,170 +221,34 @@ export default function DashboardPage() {
               {tasa > 0 && <p style={{ fontSize: '13px', color: '#34d399', marginTop: '6px', fontWeight: '600' }}>~ $ {totalUsd.toFixed(2)} USD</p>}
             </div>
           )}
-          <p style={{ fontSize: '12px', color: '#2d3748', marginTop: '6px' }}>Pagos móviles recibidos hoy {tasa > 0 ? `(Tasa BCV: Bs. ${tasa})` : ''}</p>
         </div>
 
-        {/* Capturas */}
         <div className="card">
           <p className="label" style={{ marginBottom: '12px' }}>Capturas Móviles</p>
-          {loading ? <div className="skeleton" style={{ height: '36px', marginBottom: '6px' }} /> : (
-            <p style={{ fontSize: '36px', fontWeight: '900', color: '#34d399', letterSpacing: '-0.06em', lineHeight: 1 }}>{pagos.length}</p>
-          )}
-          <p style={{ fontSize: '12px', color: '#2d3748', marginTop: '6px' }}>Comprobantes recibidos hoy</p>
+          {loading ? <div className="skeleton" style={{ height: '36px', marginBottom: '6px' }} /> : <p style={{ fontSize: '36px', fontWeight: '900', color: '#34d399', letterSpacing: '-0.06em', lineHeight: 1 }}>{pagos.length}</p>}
         </div>
 
-        {/* Procesados */}
         <div className="card">
           <p className="label" style={{ marginBottom: '12px' }}>Procesados (OCR)</p>
-          {loading ? <div className="skeleton" style={{ height: '36px', marginBottom: '6px' }} /> : (
-            <p style={{ fontSize: '36px', fontWeight: '900', color: '#22d3ee', letterSpacing: '-0.06em', lineHeight: 1 }}>{procesados}</p>
-          )}
-          <p style={{ fontSize: '12px', color: '#2d3748', marginTop: '6px' }}>Comprobantes verificados</p>
+          {loading ? <div className="skeleton" style={{ height: '36px', marginBottom: '6px' }} /> : <p style={{ fontSize: '36px', fontWeight: '900', color: '#22d3ee', letterSpacing: '-0.06em', lineHeight: 1 }}>{procesados}</p>}
         </div>
 
-        {/* WhatsApp */}
         <div className="card" style={{ borderColor: waInst?.connectionStatus === 'open' ? 'rgba(52,211,153,0.2)' : 'rgba(148,163,184,0.1)' }}>
           <p className="label" style={{ marginBottom: '12px' }}>WhatsApp</p>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span className="dot dot-pulse" style={{ background: waColor, boxShadow: `0 0 8px ${waColor}` }} />
             <p style={{ fontSize: '18px', fontWeight: '700', color: waColor }}>{waLabel}</p>
           </div>
-          <p style={{ fontSize: '12px', color: '#2d3748', marginTop: '6px' }}>
-            {waInst?.profileName ?? waInst?.name ?? 'mi_bot'}
-          </p>
         </div>
       </div>
 
-      {/* Resumen PSKLOUD */}
       <div style={{ marginBottom: '28px' }}>
         <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#e8edf5', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span className="dot dot-pulse" style={{ background: '#6366f1' }}></span>
-          Datos PSKLOUD (En vivo)
+          <span className="dot dot-pulse" style={{ background: '#6366f1' }}></span> Datos PSKLOUD (Turno actual)
         </h2>
         <PskloudPanel data={pskloudData} loading={pskloudLoading} />
       </div>
 
-      {/* Chart + Table row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.8fr', gap: '20px', marginBottom: '28px' }}>
-        {/* Bar chart */}
-        <div className="card">
-          <div style={{ marginBottom: '16px' }}>
-            <p style={{ fontSize: '14px', fontWeight: '700', color: '#e8edf5' }}>Capturas por hora</p>
-            <p style={{ fontSize: '11px', color: '#2d3748', marginTop: '2px' }}>{selectedDate ? `Fecha: ${selectedDate}` : 'Hoy'}</p>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '80px' }}>
-            {byHour.filter(b => b.hour >= 5 && b.hour <= 22).map(b => (
-              <div key={b.hour} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                <div
-                  style={{
-                    width: '100%',
-                    height: `${Math.max(4, (b.count / maxCount) * 70)}px`,
-                    background: b.count > 0
-                      ? 'linear-gradient(180deg, #818cf8 0%, #6366f1 100%)'
-                      : 'rgba(148,163,184,0.08)',
-                    borderRadius: '3px 3px 0 0',
-                    transition: 'height 0.3s ease',
-                    position: 'relative',
-                  }}
-                  title={`${b.hour}h: ${b.count} capturas`}
-                />
-              </div>
-            ))}
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', fontSize: '10px', color: '#2d3748' }}>
-            <span>05:00</span>
-            <span>13:00</span>
-            <span>22:00</span>
-          </div>
-        </div>
-
-        {/* Stats list */}
-        <div className="card">
-          <p style={{ fontSize: '14px', fontWeight: '700', color: '#e8edf5', marginBottom: '16px' }}>Resumen del día</p>
-          <div style={{ display: 'grid', gap: '0' }}>
-            {[
-              { label: 'Pagos Móviles Bs.S', value: fmtBs(total), color: '#818cf8' },
-              { label: 'Comprobantes recibidos', value: pagos.length.toString(), color: '#e8edf5' },
-              { label: 'Verificados (OCR)', value: `${procesados} / ${pagos.length}`, color: '#34d399' },
-              { label: 'Tasa de éxito', value: pagos.length > 0 ? `${Math.round((procesados / pagos.length) * 100)}%` : '—', color: '#22d3ee' },
-              { label: 'Instancia WA', value: waInst?.name ?? 'mi_bot', color: '#94a3b8' },
-              { label: 'Estado WA', value: waLabel, color: waColor },
-            ].map(({ label, value, color }) => (
-              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 0', borderBottom: '1px solid rgba(148,163,184,0.06)' }}>
-                <span style={{ fontSize: '13px', color: '#475569' }}>{label}</span>
-                <span style={{ fontSize: '13px', fontWeight: '700', color }}>{value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Recent payments table */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px 16px' }}>
-          <div>
-            <p style={{ fontSize: '14px', fontWeight: '700', color: '#e8edf5' }}>Pagos Móviles Recientes</p>
-            <p style={{ fontSize: '11px', color: '#2d3748', marginTop: '2px' }}>Últimos 50 comprobantes del día</p>
-          </div>
-          <span className={`badge ${selectedDate ? 'badge-yellow' : 'badge-green'}`} style={{ gap: '6px' }}>
-            <span className="dot dot-pulse" style={{ background: selectedDate ? '#fbbf24' : '#34d399', width: '6px', height: '6px' }} />
-            {selectedDate ? 'Historial' : 'En vivo'}
-          </span>
-        </div>
-
-        {loading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: '#475569' }}>
-            <div className="animate-spin" style={{ width: '24px', height: '24px', border: '2px solid rgba(99,102,241,0.2)', borderTopColor: '#6366f1', borderRadius: '50%', margin: '0 auto 12px' }} />
-            Cargando datos de Supabase…
-          </div>
-        ) : pagos.length === 0 ? (
-          <div style={{ padding: '60px', textAlign: 'center' }}>
-            <div style={{ fontSize: '40px', marginBottom: '12px' }}>📭</div>
-            <p style={{ color: '#475569', fontWeight: '600' }}>Sin pagos móviles hoy</p>
-            <p style={{ color: '#2d3748', fontSize: '12px', marginTop: '6px' }}>
-              Los comprobantes de pago móvil aparecerán aquí automáticamente
-            </p>
-          </div>
-        ) : (
-          <div className="table-wrap" style={{ borderRadius: 0, border: 'none' }}>
-            <table>
-              <thead>
-                <tr>
-                  <th>Hora</th>
-                  <th>Banco</th>
-                  <th>Referencia</th>
-                  <th>Teléfono</th>
-                  <th>Monto Bs.S</th>
-                  <th>Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pagos.map((p) => (
-                  <tr key={p.id}>
-                    <td style={{ color: '#475569', fontSize: '12px', fontFamily: 'monospace' }}>{fmtTime(p.created_at)}</td>
-                    <td style={{ fontWeight: '500', fontSize: '13px' }}>{p.banco_origen || '—'}</td>
-                    <td style={{ fontFamily: 'monospace', fontSize: '12px', color: '#818cf8' }}>{p.referencia || '—'}</td>
-                    <td style={{ fontSize: '12px' }}>{p.telefono_emisor || '—'}</td>
-                    <td>
-                      <div style={{ fontWeight: '800', color: '#34d399', fontSize: '13px' }}>{fmtBs(p.monto_bs)}</div>
-                      {(p.monto_usd || (tasa > 0 ? (p.monto_bs / tasa) : 0)) > 0 && (
-                        <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px', fontWeight: '500' }}>
-                          ~ $ {(p.monto_usd || (p.monto_bs / tasa)).toFixed(2)} USD
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <span className={`badge ${p.procesado ? 'badge-green' : 'badge-yellow'}`}>
-                        {p.procesado ? '✓ Procesado' : '⏳ Pendiente'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
     </div>
   );
 }

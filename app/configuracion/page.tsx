@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import ShiftPreviewModal from '@/app/components/ShiftPreviewModal';
 
 type Config = {
   startTime: string;
@@ -34,6 +35,13 @@ export default function ConfiguracionPage() {
   const [cfg, setCfg]       = useState<Config>(DEFAULT);
   const [saved, setSaved]   = useState(false);
   const [copied, setCopied] = useState(false);
+  
+  // States for Forced Close Preview
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [forcedStart, setForcedStart] = useState('');
+  const [forcedEnd, setForcedEnd] = useState('');
+  const [forcedHoraInput, setForcedHoraInput] = useState('');
+  const [supervisorName, setSupervisorName] = useState('');
 
   useEffect(() => {
     fetch('/api/config')
@@ -67,8 +75,72 @@ export default function ConfiguracionPage() {
   const set = (key: keyof Config) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setCfg(prev => ({ ...prev, [key]: e.target.value }));
 
+  const openForcedPreview = async () => {
+    const input = document.getElementById('cfg-forzar') as HTMLInputElement;
+    const hora = input?.value;
+    if (!hora) return alert('Selecciona una hora');
+    
+    try {
+      const res = await fetch('/api/turnos');
+      const json = await res.json();
+      
+      if (json.perfil) {
+        setSupervisorName(json.perfil.nombre_completo);
+      }
+      
+      if (json.ok && json.active) {
+        return alert('Hay un turno activo actualmente. Ciérralo primero.');
+      }
+      
+      let startD = new Date();
+      startD.setHours(6, 0, 0, 0);
+      
+      // If no active, but there are shifts, how do we get the last closed one?
+      // For simplicity, we just use the current day at 6 AM if we don't have a specific API for getting the absolute last shift.
+      // But let's build the forcedEnd Date from the input hora.
+      const now = new Date();
+      const [h, m] = hora.split(':').map(Number);
+      const endD = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0, 0);
+      
+      setForcedStart(startD.toISOString()); // It's an approximation for the preview
+      setForcedEnd(endD.toISOString());
+      setForcedHoraInput(hora);
+      setPreviewOpen(true);
+    } catch {
+      alert('Error preparando la vista previa');
+    }
+  };
+
+  const executeForcedClose = async () => {
+    try {
+      const res = await fetch('/api/turnos/forzar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hora: forcedHoraInput })
+      });
+      const json = await res.json();
+      if (json.ok) {
+        alert('Corte forzado realizado exitosamente. El próximo turno iniciará desde las ' + forcedHoraInput);
+      } else {
+        alert(json.error || 'Error al forzar el corte');
+      }
+    } catch {
+      alert('Error de red al intentar forzar el corte');
+    }
+  };
+
   return (
     <div className="animate-fade-in">
+      <ShiftPreviewModal
+        isOpen={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        onConfirm={executeForcedClose}
+        start={forcedStart}
+        end={forcedEnd}
+        isForcedClose={true}
+        supervisorName={supervisorName}
+      />
+      
       <div style={{ marginBottom: '28px' }}>
         <p className="eyebrow" style={{ marginBottom: '4px' }}>Sistema</p>
         <h1 className="page-title">Configuración</h1>
@@ -239,6 +311,37 @@ export default function ConfiguracionPage() {
               <input type="time" className="input" value={cfg.horario3} onChange={set('horario3')} />
             </div>
             <p style={{ fontSize: '11px', color: '#2d3748', marginTop: '6px' }}>Solo se harán llamadas a la API a estas horas (máx 3/día).</p>
+          </div>
+        </div>
+
+        {/* --- Cierre Forzado --- */}
+        <div className="card" style={{ borderColor: '#ef4444' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+            <div style={{ ...iconWrap, background: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.2)' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line>
+              </svg>
+            </div>
+            <div>
+              <p style={{ ...cardTitle, color: '#fca5a5' }}>Cierre Forzado (Admin)</p>
+              <p style={cardSub}>Fuerza un corte de caja si un cajero abandonó el turno sin cerrar</p>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', alignItems: 'flex-end' }}>
+            <div>
+              <p className="label" style={{ marginBottom: '8px' }}>Hora de Cierre Forzado</p>
+              <input id="cfg-forzar" type="time" className="input" defaultValue="14:00" />
+            </div>
+            <div>
+              <button 
+                className="btn btn-primary" 
+                style={{ width: '100%', background: '#ef4444', border: 'none', color: '#fff' }}
+                onClick={openForcedPreview}
+              >
+                Ejecutar Corte
+              </button>
+            </div>
           </div>
         </div>
 

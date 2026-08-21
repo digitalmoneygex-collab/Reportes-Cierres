@@ -44,6 +44,7 @@ const METODOS_PAGO_LABELS: Record<string, string> = {
   binance: '🟡 Binance',
   zelle: '💸 Zelle',
   bio_pago: '🔵 Bio Pago',
+  gasto: '📉 Gasto',
   devolucion: '↩️ Devolución',
 };
 

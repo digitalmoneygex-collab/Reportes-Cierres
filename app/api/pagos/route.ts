@@ -15,10 +15,16 @@ export async function GET(request: Request) {
   const search   = searchParams.get('search');
 
   try {
+    const abierto_at = searchParams.get('abierto_at');
+    const cerrado_at = searchParams.get('cerrado_at');
+
     let start: Date;
     let end: Date;
 
-    if (date) {
+    if (abierto_at) {
+      start = new Date(abierto_at);
+      end = cerrado_at ? new Date(cerrado_at) : new Date();
+    } else if (date) {
       start = new Date(`${date}T00:00:00.000-04:00`);
       end = new Date(`${date}T23:59:59.999-04:00`);
     } else {
@@ -27,14 +33,12 @@ export async function GET(request: Request) {
       const startTime = config?.start_time || '06:00';
       
       const now = new Date();
-      // Ajustar `now` a hora Venezuela (UTC-4)
       const vzDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Caracas' }));
       
       const [sh, sm] = startTime.split(':').map(Number);
       const resetMinutes = sh * 60 + sm;
       const currentMinutes = vzDate.getHours() * 60 + vzDate.getMinutes();
       
-      // Si estamos antes de la hora de reinicio, el "hoy lógico" es el día anterior
       if (currentMinutes < resetMinutes) {
         vzDate.setDate(vzDate.getDate() - 1);
       }
@@ -43,7 +47,6 @@ export async function GET(request: Request) {
       const m = String(vzDate.getMonth() + 1).padStart(2, '0');
       const d = String(vzDate.getDate()).padStart(2, '0');
       
-      // Rango exacto: desde la hora de inicio del día lógico, hasta la misma hora del día siguiente
       start = new Date(`${y}-${m}-${d}T${startTime}:00.000-04:00`);
       
       const nextDay = new Date(vzDate);
@@ -53,7 +56,6 @@ export async function GET(request: Request) {
       const nd = String(nextDay.getDate()).padStart(2, '0');
       
       end = new Date(`${ny}-${nm}-${nd}T${startTime}:00.000-04:00`);
-      // Restamos 1 milisegundo para no incluir el minuto exacto del día siguiente
       end = new Date(end.getTime() - 1);
     }
 

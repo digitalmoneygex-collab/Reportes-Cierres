@@ -1,26 +1,61 @@
 import { NextResponse } from 'next/server';
-
-const VALID_USER = process.env.ADMIN_USER ?? 'admin';
-const VALID_PASS = process.env.ADMIN_PASS ?? 'Admin2024!';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
 export async function POST(request: Request) {
   try {
     const { username, password } = await request.json() as { username: string; password: string };
 
-    if (username === VALID_USER && password === VALID_PASS) {
-      const response = NextResponse.json({ ok: true });
-      response.cookies.set('auth-token', 'gex-authenticated', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7, // 7 días
-        path: '/',
-      });
-      return response;
+    if (!username || !password) {
+      return NextResponse.json({ ok: false, error: 'Usuario y contraseña requeridos' }, { status: 400 });
     }
 
-    return NextResponse.json({ ok: false, error: 'Usuario o contraseña incorrectos' }, { status: 401 });
-  } catch {
-    return NextResponse.json({ ok: false, error: 'Solicitud inválida' }, { status: 400 });
+    // Convertir cédula a correo falso para Supabase Auth
+    const email = username.includes('@') ? username : `${username}@gex.com`;
+
+    const cookieStore = cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return cookieStore.get(name)?.value;
+          },
+          set(name: string, value: string, options: CookieOptions) {
+            cookieStore.set({ name, value, ...options });
+          },
+          remove(name: string, options: CookieOptions) {
+            cookieStore.set({ name, value: '', ...options });
+          },
+        },
+      }
+    );
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      return NextResponse.json({ ok: false, error: 'Usuario o contraseña incorrectos' }, { status: 401 });
+    }
+
+    // Ahora buscamos su perfil en public.usuarios
+    const { data: profile, error: profileErr } = await supabase
+      .from('usuarios')
+      .select('*')
+      .eq('id', data.user.id)
+      .single();
+
+    if (profileErr || !profile) {
+      // Si no tiene perfil, cerramos sesión por seguridad
+      await supabase.auth.signOut();
+      return NextResponse.json({ ok: false, error: 'Usuario no tiene perfil en el sistema. Contacte al supervisor.' }, { status: 403 });
+    }
+
+    return NextResponse.json({ ok: true, user: profile });
+  } catch (err: any) {
+    return NextResponse.json({ ok: false, error: err.message || 'Error de red' }, { status: 500 });
   }
 }

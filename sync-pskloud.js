@@ -272,6 +272,7 @@ async function sync() {
            ${selectDoc}  AS documento,
            ${selectCli}  AS nombre_cliente,
            oc.fecha      AS fecha,
+           oc.fechayhora AS fechayhora,
            oc.monto      AS monto_bs,
            oc.tipodoc    AS tipo_doc
          FROM operclit oc
@@ -282,6 +283,7 @@ async function sync() {
            documento,
            nombrecli AS nombre_cliente,
            emision AS fecha,
+           fechayhora,
            totalfinal AS monto_bs,
            tipodoc AS tipo_doc
          FROM operti
@@ -292,13 +294,21 @@ async function sync() {
       );
 
       if (facturaRows.length > 0) {
-        const facturasPayload = facturaRows.map(f => ({
-          fecha:           today,
-          documento:       String(f.documento || '').trim(),
-          nombre_cliente:  String(f.nombre_cliente || 'CLIENTE GENERAL').trim(),
-          monto_bs:        Number(f.monto_bs ?? 0),
-          tipo_doc:        String(f.tipo_doc || 'FAC').trim(),
-        }));
+        const facturasPayload = facturaRows.map(f => {
+          let fechaVal = new Date().toISOString();
+          if (f.fechayhora && !isNaN(new Date(f.fechayhora).getTime())) {
+            fechaVal = new Date(f.fechayhora).toISOString();
+          }
+          
+          return {
+            fecha:           today,
+            fechayhora:      fechaVal,
+            documento:       String(f.documento || '').trim(),
+            nombre_cliente:  String(f.nombre_cliente || 'CLIENTE GENERAL').trim(),
+            monto_bs:        Number(f.monto_bs ?? 0),
+            tipo_doc:        String(f.tipo_doc || 'FAC').trim(),
+          };
+        });
 
         const { error: facError } = await supabase
           .from('pskloud_facturas')
@@ -312,6 +322,62 @@ async function sync() {
       } else {
         console.log('  INFO Sin facturas para subir hoy');
       }
+      
+      // ── Subir artículos detallados para turnos ─────────────────
+      const [articulosRaw] = await conn.query(
+        `SELECT documento, fechayhora, grupo, nombre, cantidad
+         FROM opermv
+         WHERE DATE(fechadoc) = ?
+           AND tipodoc = 'FAC'
+           AND grupo IN ('01','02','03','04')`,
+        [today]
+      );
+      
+      if (articulosRaw.length > 0) {
+         const payloadMap = {};
+         for (const r of articulosRaw) {
+           let cat = 'otros';
+           const g = String(r.grupo).trim();
+           if (g === '03') cat = 'burguer';
+           else if (g === '02') cat = 'pasteles';
+           else if (g === '04') cat = 'reposteria';
+           
+           let fechaVal = new Date().toISOString();
+           if (r.fechayhora && !isNaN(new Date(r.fechayhora).getTime())) {
+             fechaVal = new Date(r.fechayhora).toISOString();
+           }
+           
+           const doc = String(r.documento).trim();
+           const nom = normalizarNombre(r.nombre);
+           const key = `${doc}_${nom}`;
+           
+           if (!payloadMap[key]) {
+             payloadMap[key] = {
+               fecha: today,
+               fechayhora: fechaVal,
+               documento: doc,
+               categoria: cat,
+               nombre: nom,
+               cantidad: 0
+             };
+           }
+           payloadMap[key].cantidad += Number(r.cantidad) || 0;
+         }
+         
+         const articulosPayload = Object.values(payloadMap);
+
+         
+         const { error: artError } = await supabase
+           .from('pskloud_articulos')
+           .upsert(articulosPayload, { onConflict: 'documento,nombre' });
+           
+         if (artError) {
+           console.error(`  ERROR al subir articulos: ${artError.message}`);
+         } else {
+           console.log(`  OK ${articulosRaw.length} articulos subidos a pskloud_articulos`);
+         }
+      }
+
     }
 
   } catch (err) {
