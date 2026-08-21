@@ -180,10 +180,11 @@ async function sync() {
     console.log(`  INFO Tipos de documento encontrados hoy en operclit:`, tiposDoc.map(r => r.tipodoc).join(', '));
 
     // ── Devoluciones en Efectivo ───────────────────────────────
+    // Las notas de crédito/devoluciones se guardan en la cabecera (operti), no en operclit.
     const [[devRow]] = await conn.query(
-      `SELECT COALESCE(SUM(monto), 0) AS total_dev
-       FROM operclit
-       WHERE DATE(fecha) = ?
+      `SELECT COALESCE(SUM(totalfinal), 0) AS total_dev
+       FROM operti
+       WHERE DATE(emision) = ?
          AND tipodoc IN ('DEV', 'N/C', 'NC')`,
       [today]
     );
@@ -275,9 +276,19 @@ async function sync() {
            oc.tipodoc    AS tipo_doc
          FROM operclit oc
          WHERE DATE(oc.fecha) = ?
-           AND oc.tipodoc IN ('FAC','DEV','N/C','NC')
-         ORDER BY ${selectDoc}`,
-        [today]
+           AND oc.tipodoc = 'FAC'
+         UNION ALL
+         SELECT
+           documento,
+           nombrecli AS nombre_cliente,
+           emision AS fecha,
+           totalfinal AS monto_bs,
+           tipodoc AS tipo_doc
+         FROM operti
+         WHERE DATE(emision) = ?
+           AND tipodoc IN ('DEV', 'N/C', 'NC')
+         ORDER BY documento`,
+        [today, today]
       );
 
       if (facturaRows.length > 0) {
