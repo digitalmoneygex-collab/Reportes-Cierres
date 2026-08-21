@@ -240,40 +240,63 @@ async function sync() {
     }
 
     // ── Subir facturas individuales (para Conciliación) ────────
-    const [facturaRows] = await conn.query(
-      `SELECT
-         oc.numdoc  AS documento,
-         oc.nomcli  AS nombre_cliente,
-         oc.fecha   AS fecha,
-         oc.monto   AS monto_bs,
-         oc.tipodoc AS tipo_doc
-       FROM operclit oc
-       WHERE DATE(oc.fecha) = ?
-         AND oc.tipodoc IN ('FAC','DEV')
-       ORDER BY oc.numdoc`,
-      [today]
+    // Primero descubrir los nombres reales de las columnas en operclit
+    const [colRows] = await conn.query(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'operclit'
+       ORDER BY ORDINAL_POSITION`,
+      [DB.database]
     );
+    const colNames = colRows.map(r => String(r.COLUMN_NAME).toLowerCase());
+    console.log(`  INFO Columnas de operclit: ${colNames.join(', ')}`);
 
-    if (facturaRows.length > 0) {
-      const facturasPayload = facturaRows.map(f => ({
-        fecha:           today,
-        documento:       String(f.documento || '').trim(),
-        nombre_cliente:  String(f.nombre_cliente || 'CLIENTE GENERAL').trim(),
-        monto_bs:        Number(f.monto_bs ?? 0),
-        tipo_doc:        String(f.tipo_doc || 'FAC').trim(),
-      }));
+    // Resolver nombre del número de documento (distintas versiones de PSKloud)
+    const colDoc   = ['nrodoc','numdoc','documento','ndoc','cod_doc','codoc'].find(c => colNames.includes(c)) || null;
+    // Resolver nombre del cliente
+    const colCli   = ['nomcli','nombre_cliente','nomcliente','cliente','nom_cli'].find(c => colNames.includes(c)) || null;
 
-      const { error: facError } = await supabase
-        .from('pskloud_facturas')
-        .upsert(facturasPayload, { onConflict: 'fecha,documento' });
-
-      if (facError) {
-        console.error(`  ERROR al subir facturas: ${facError.message}`);
-      } else {
-        console.log(`  OK ${facturaRows.length} facturas subidas a pskloud_facturas`);
-      }
+    if (!colDoc) {
+      console.warn('  WARN No se encontró columna de documento en operclit. Columnas disponibles:', colNames.join(', '));
+      console.warn('  WARN Saltando subida de facturas. Ajusta sync-pskloud.js con el nombre correcto.');
     } else {
-      console.log('  INFO Sin facturas para subir hoy');
+      const selectDoc = `oc.\`${colDoc}\``;
+      const selectCli = colCli ? `oc.\`${colCli}\`` : `'CLIENTE GENERAL'`;
+
+      const [facturaRows] = await conn.query(
+        `SELECT
+           ${selectDoc}  AS documento,
+           ${selectCli}  AS nombre_cliente,
+           oc.fecha      AS fecha,
+           oc.monto      AS monto_bs,
+           oc.tipodoc    AS tipo_doc
+         FROM operclit oc
+         WHERE DATE(oc.fecha) = ?
+           AND oc.tipodoc IN ('FAC','DEV')
+         ORDER BY ${selectDoc}`,
+        [today]
+      );
+
+      if (facturaRows.length > 0) {
+        const facturasPayload = facturaRows.map(f => ({
+          fecha:           today,
+          documento:       String(f.documento || '').trim(),
+          nombre_cliente:  String(f.nombre_cliente || 'CLIENTE GENERAL').trim(),
+          monto_bs:        Number(f.monto_bs ?? 0),
+          tipo_doc:        String(f.tipo_doc || 'FAC').trim(),
+        }));
+
+        const { error: facError } = await supabase
+          .from('pskloud_facturas')
+          .upsert(facturasPayload, { onConflict: 'fecha,documento' });
+
+        if (facError) {
+          console.error(`  ERROR al subir facturas: ${facError.message}`);
+        } else {
+          console.log(`  OK ${facturaRows.length} facturas subidas a pskloud_facturas`);
+        }
+      } else {
+        console.log('  INFO Sin facturas para subir hoy');
+      }
     }
 
   } catch (err) {
