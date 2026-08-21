@@ -227,14 +227,53 @@ async function sync() {
     console.log(`     TOTAL RECIBIDO  : Bs. ${totalRecibidoBs.toLocaleString('es-VE')}`);
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // ── Subir snapshot del día ─────────────────────────────────
     const { error } = await supabase
       .from('pskloud_snapshot')
       .upsert(payload, { onConflict: 'fecha' });
 
     if (error) {
-      console.error('  ERROR al subir a Supabase:', error.message);
+      console.error('  ERROR al subir snapshot a Supabase:', error.message);
     } else {
-      console.log('  OK Datos subidos a Supabase correctamente');
+      console.log('  OK Snapshot subido a Supabase correctamente');
+    }
+
+    // ── Subir facturas individuales (para Conciliación) ────────
+    const [facturaRows] = await conn.query(
+      `SELECT
+         oc.numdoc  AS documento,
+         oc.nomcli  AS nombre_cliente,
+         oc.fecha   AS fecha,
+         oc.monto   AS monto_bs,
+         oc.tipodoc AS tipo_doc
+       FROM operclit oc
+       WHERE DATE(oc.fecha) = ?
+         AND oc.tipodoc IN ('FAC','DEV')
+       ORDER BY oc.numdoc`,
+      [today]
+    );
+
+    if (facturaRows.length > 0) {
+      const facturasPayload = facturaRows.map(f => ({
+        fecha:           today,
+        documento:       String(f.documento || '').trim(),
+        nombre_cliente:  String(f.nombre_cliente || 'CLIENTE GENERAL').trim(),
+        monto_bs:        Number(f.monto_bs ?? 0),
+        tipo_doc:        String(f.tipo_doc || 'FAC').trim(),
+      }));
+
+      const { error: facError } = await supabase
+        .from('pskloud_facturas')
+        .upsert(facturasPayload, { onConflict: 'fecha,documento' });
+
+      if (facError) {
+        console.error(`  ERROR al subir facturas: ${facError.message}`);
+      } else {
+        console.log(`  OK ${facturaRows.length} facturas subidas a pskloud_facturas`);
+      }
+    } else {
+      console.log('  INFO Sin facturas para subir hoy');
     }
 
   } catch (err) {
