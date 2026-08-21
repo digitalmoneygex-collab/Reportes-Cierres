@@ -162,6 +162,7 @@ async function sync() {
     conn = await mysql.createConnection(DB);
     console.log('  OK Conexion MySQL establecida');
 
+    // ── Total Ingresos (ventas facturadas) ────────────────────
     const [[totalRow]] = await conn.query(
       `SELECT COALESCE(SUM(monto), 0) AS total
        FROM operclit
@@ -170,6 +171,20 @@ async function sync() {
       [today]
     );
     const totalBs = Number(totalRow?.total ?? 0);
+
+    // ── Devoluciones en Efectivo ───────────────────────────────
+    // PSKloud registra las devoluciones con tipodoc = 'DEV'.
+    // Solo contamos las que se devolvieron en efectivo (formapago = 'EFE' o similar).
+    // El monto en operclit para DEV puede ser positivo; lo restamos del ingreso.
+    const [[devRow]] = await conn.query(
+      `SELECT COALESCE(SUM(monto), 0) AS total_dev
+       FROM operclit
+       WHERE DATE(fecha) = ?
+         AND tipodoc = 'DEV'`,
+      [today]
+    );
+    const devolucionesEfectivoBs = Number(devRow?.total_dev ?? 0);
+    const totalRecibidoBs = totalBs - devolucionesEfectivoBs;
 
     const [rows] = await conn.query(
       `SELECT grupo, codigo, nombre, SUM(cantidad) AS cantidad
@@ -198,13 +213,18 @@ async function sync() {
     const payload = {
       fecha: today,
       synced_at: new Date().toISOString(),
-      corte_caja_bs: totalBs,
+      corte_caja_bs: totalBs,                          // Total Ingresos (bruto)
+      devoluciones_efectivo_bs: devolucionesEfectivoBs, // Devoluc. Efect.(-)
+      total_recibido_bs: totalRecibidoBs,              // TOTAL RECIBIDO = Ingresos - Devoluciones
       burguer: burguerData,
       pasteles: pastelesData,
       reposteria: { items: repItems, total: totalRep }
     };
 
-    console.log(`  OK Datos extraidos -> Bs. ${totalBs.toLocaleString('es-VE')}, ${rows.length} articulos`);
+    console.log(`  OK Datos extraidos -> ${rows.length} articulos`);
+    console.log(`     Total Ingresos  : Bs. ${totalBs.toLocaleString('es-VE')}`);
+    console.log(`     Devoluciones Ef.: Bs. ${devolucionesEfectivoBs.toLocaleString('es-VE')}`);
+    console.log(`     TOTAL RECIBIDO  : Bs. ${totalRecibidoBs.toLocaleString('es-VE')}`);
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
     const { error } = await supabase
@@ -215,7 +235,6 @@ async function sync() {
       console.error('  ERROR al subir a Supabase:', error.message);
     } else {
       console.log('  OK Datos subidos a Supabase correctamente');
-      console.log(`     Total Bs.: ${totalBs.toLocaleString('es-VE')}`);
     }
 
   } catch (err) {

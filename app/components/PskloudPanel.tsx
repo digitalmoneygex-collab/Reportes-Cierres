@@ -9,7 +9,12 @@ type RepoItem  = { nombre: string; cantidad: number };
 
 interface PskloudData {
   ok: boolean;
-  corteCaja: { totalBs: number; totalUsd: number; tasa: number };
+  corteCaja: {
+    totalBs: number; totalBsUsd: number;               // Total Ingresos
+    devolucionesEfBs: number; devolucionesEfUsd: number; // Devoluciones
+    totalRecibidoBs: number; totalRecibidoUsd: number;  // TOTAL RECIBIDO
+    tasa: number; totalUsd: number;
+  };
   burguer: {
     combosHamb: ComboItem[];
     hambSueltas: ComboItem[];
@@ -136,17 +141,56 @@ export default function PskloudPanel({ data, loading }: { data: PskloudData | nu
       {/* ── Ventas Sistema ── */}
       <div className="card" style={{ background: 'linear-gradient(135deg, #0c1428 0%, #0d1830 100%)', border: '1px solid rgba(99,102,241,0.22)', boxShadow: '0 0 32px rgba(99,102,241,0.07)' }}>
         <SectionTitle icon="🏪">Ventas Sistema</SectionTitle>
-        <p style={{ fontSize: '28px', fontWeight: '900', color: '#818cf8', letterSpacing: '-0.05em', lineHeight: 1.1, marginBottom: '4px' }}>
-          {fmtBs(corteCaja?.totalBs)}
+
+        {/* Número grande: TOTAL RECIBIDO */}
+        <p style={{ fontSize: '28px', fontWeight: '900', color: '#818cf8', letterSpacing: '-0.05em', lineHeight: 1.1, marginBottom: '2px' }}>
+          {fmtBs(corteCaja?.totalRecibidoBs ?? corteCaja?.totalBs)}
         </p>
         {corteCaja?.tasa > 0 && (
           <p style={{ fontSize: '13px', color: '#34d399', fontWeight: '700', marginBottom: '12px' }}>
-            ≈ $ {corteCaja.totalUsd.toFixed(2)} USD
+            ≈ $ {(corteCaja.totalRecibidoUsd ?? corteCaja.totalUsd).toFixed(2)} USD
           </p>
         )}
+
+        <Divider />
+
+        {/* Total Ingresos */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0' }}>
+          <span style={{ fontSize: '12px', color: '#475569' }}>Total Ingresos</span>
+          <span style={{ textAlign: 'right' }}>
+            <span style={{ display: 'block', fontSize: '12px', color: '#94a3b8', fontWeight: '600' }}>{fmtBs(corteCaja?.totalBs)}</span>
+            {corteCaja?.tasa > 0 && (
+              <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>$ {(corteCaja.totalBsUsd ?? 0).toFixed(2)} USD</span>
+            )}
+          </span>
+        </div>
+
+        {/* Devoluciones — solo si hay */}
+        {(corteCaja?.devolucionesEfBs ?? 0) > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0' }}>
+            <span style={{ fontSize: '12px', color: '#f87171', fontWeight: '700' }}>Devoluciones (-)</span>
+            <span style={{ textAlign: 'right' }}>
+              <span style={{ display: 'block', fontSize: '12px', color: '#f87171', fontWeight: '700' }}>- {fmtBs(corteCaja.devolucionesEfBs)}</span>
+              {corteCaja?.tasa > 0 && (
+                <span style={{ display: 'block', fontSize: '11px', color: '#fca5a5' }}>- $ {(corteCaja.devolucionesEfUsd ?? 0).toFixed(2)} USD</span>
+              )}
+            </span>
+          </div>
+        )}
+
+        {/* TOTAL RECIBIDO */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0 4px', borderTop: '1px solid rgba(148,163,184,0.15)', marginTop: '4px' }}>
+          <span style={{ fontSize: '12px', color: '#818cf8', fontWeight: '800' }}>TOTAL RECIBIDO</span>
+          <span style={{ textAlign: 'right' }}>
+            <span style={{ display: 'block', fontSize: '12px', color: '#818cf8', fontWeight: '800' }}>{fmtBs(corteCaja?.totalRecibidoBs ?? corteCaja?.totalBs)}</span>
+            {corteCaja?.tasa > 0 && (
+              <span style={{ display: 'block', fontSize: '11px', color: '#a5b4fc' }}>$ {(corteCaja.totalRecibidoUsd ?? corteCaja.totalUsd).toFixed(2)} USD</span>
+            )}
+          </span>
+        </div>
+
         <Divider />
         <Row label="Tasa BCV" value={`Bs. ${corteCaja?.tasa?.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || 0}`} color="#fbbf24" bold />
-        <Row label="Fuente" value="Corte de Caja" color="#2d3748" />
       </div>
 
       {/* ── Burguer ── */}

@@ -76,18 +76,33 @@ export async function GET(request: Request) {
     const hoursAgo  = (Date.now() - syncedAt.getTime()) / (1000 * 60 * 60);
     const isRecent  = hoursAgo < 24;
 
-    const tasa     = Number(tasaResult ?? 0);
-    const totalBs  = Number(data.corte_caja_bs ?? 0);
-    const totalUsd = tasa > 0 ? totalBs / tasa : 0;
+    const tasa               = Number(tasaResult ?? 0);
+    const totalBs             = Number(data.corte_caja_bs ?? 0);           // Total Ingresos (bruto)
+    const devolucionesEfBs    = Number(data.devoluciones_efectivo_bs ?? 0); // Devoluc. Efect.(-)
+    const totalRecibidoBs     = Number(data.total_recibido_bs ?? totalBs);  // TOTAL RECIBIDO
+
+    // Conversiones USD
+    const totalBsUsd          = tasa > 0 ? totalBs / tasa : 0;
+    const devolucionesEfUsd   = tasa > 0 ? devolucionesEfBs / tasa : 0;
+    const totalRecibidoUsd    = tasa > 0 ? totalRecibidoBs / tasa : 0;
 
     return NextResponse.json({
       ok: true,
       synced_at: data.synced_at,
       is_recent: isRecent,
       corteCaja: {
+        // Total Ingresos (corte_caja_bs)
         totalBs,
+        totalBsUsd,
+        // Devoluciones en efectivo
+        devolucionesEfBs,
+        devolucionesEfUsd,
+        // TOTAL RECIBIDO = lo que se muestra como "Ventas Sistema"
+        totalRecibidoBs,
+        totalRecibidoUsd,
         tasa,
-        totalUsd,
+        // Alias legacy para compatibilidad
+        totalUsd: totalRecibidoUsd,
       },
       burguer:    data.burguer,
       pasteles:   data.pasteles,

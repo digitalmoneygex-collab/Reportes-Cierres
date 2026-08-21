@@ -1,0 +1,135 @@
+{
+  "AREPA CABIMERA": {
+    "Arepa C": 1.0,
+    "Carne M": 1.0,
+    "Huevo": 1.0
+  },
+  "COMBO 10 HAMB CARNE + BEBIDA": {
+    "Carne H": 10.0,
+    "Pan Burguer": 10.0,
+    "Bebida": 1.0
+  },
+  "COMBO 14 HAMB CARNE + BEBIDA": {
+    "Carne H": 14.0,
+    "Pan Burguer": 14.0,
+    "Bebida": 1.0
+  },
+  "COMBO 7 HAMB CARNE + BEBIDA": {
+    "Carne H": 7.0,
+    "Pan Burguer": 7.0,
+    "Bebida": 1.0
+  },
+  "HAMB. DOBLE CARNE": {
+    "Carne H": 2.0,
+    "Pan Burguer": 1.0
+  },
+  "HAMB. POLLO ESPECIAL": {
+    "Carne H": 2.0,
+    "Pan Burguer": 1.0
+  },
+  "HAMB. MIXTA": {
+    "Carne H": 1.0,
+    "Pollo": 1.0,
+    "Pan Burguer": 1.0
+  },
+  "HAMB. POLLO": {
+    "Carne H": 1.0,
+    "Pan Burguer": 1.0
+  },
+  "HAMB. PAPICHYS": {
+    "Carne H": 1.0,
+    "Pollo": 2.0,
+    "Pan Burguer": 1.0
+  },
+  "HAMB. CARNE": {
+    "Carne H": 1.0,
+    "Pan Burguer": 1.0
+  },
+  "COMBO 8 PERRO CALIENTE + BEBIDA": {
+    "Pan perro": 8.0,
+    "Salchicha": 8.0,
+    "Bebida": 1.0
+  },
+  "PERRO CALIENTE": {
+    "Pan perro": 1.0,
+    "Salchicha": 1.0
+  },
+  "PAPAS FRITAS 150GR": {},
+  "PASAPALOS 25UND PASTELES": {
+    "Pieza F": 25.0
+  },
+  "PASAPALOS 25UND TEQUE\u00d1OS": {
+    "Pieza F": 25.0
+  },
+  "PASAPALOS 50UND PASTELES": {
+    "Pieza F": 50.0
+  },
+  "PASAPALOS 50UND TEQUE\u00d1OS": {
+    "Pieza F": 50.0
+  },
+  "PASTELES 12 + BEBIDA": {
+    "Pieza P": 12.0,
+    "Bebida": 1.0
+  },
+  "TEQUE\u00d0O 12 + BEBIDAS": {
+    "Pieza P": 12.0,
+    "Bebida": 1.0
+  },
+  "COMBO 6 PASTELES MOLIDA": {
+    "Pieza P": 6.0
+  },
+  "COMBO 6 PASTELES PAPAQUESO": {
+    "Pieza P": 6.0
+  },
+  "COMBO 6 PASTELES QUESO": {
+    "Pieza P": 6.0
+  },
+  "COMBO 6 PASTELES VARIADO": {
+    "Pieza P": 6.0
+  },
+  "COMBO 6 TEQUE\u00d1OS": {
+    "Pieza P": 6.0
+  },
+  "TEQUE\u00d1O": {
+    "Pieza G": 1.0
+  },
+  "EMPANADA MECHADA": {
+    "Pieza G": 1.0
+  },
+  "EMPANADA PAPAQUESO": {
+    "Pieza G": 1.0
+  },
+  "EMPANADA QUESO": {
+    "Pieza G": 1.0
+  },
+  "MANDOCAS X UND": {
+    "Pieza G": 1.0
+  },
+  "PASAPALOS TEQUE YOYO X50": {
+    "Pieza F": 50.0
+  },
+  "TEQUEYOYOS": {
+    "Pieza G": 1.0
+  },
+  "PASTEL PAPAQUESO": {
+    "Pieza G": 1.0
+  },
+  "PASTEL MOLIDA": {
+    "Pieza G": 1.0
+  },
+  "PASTEL MECHADA": {
+    "Pieza G": 1.0
+  },
+  "PASTEL PIZZA": {
+    "Pieza G": 1.0
+  },
+  "PASTEL QUESO": {
+    "Pieza G": 1.0
+  },
+  "SALSA GRANDE": {},
+  "SALSA PEQUE\u00d0A": {},
+  "NESCAFE+MILHOJA": {},
+  "BRAZO GITANO": {},
+  "BOMBA": {},
+  "MILHOJAS RELLENA": {}
+}
