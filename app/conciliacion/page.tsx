@@ -35,29 +35,37 @@ const fmtBs = (v: number) =>
 export default function ConciliacionPage() {
   const todayVZ = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Caracas' });
 
-  const [fecha, setFecha]           = useState(todayVZ);
+  const [fecha, setFecha]           = useState('');           // La resuelve la API con la ventana horaria
   const [facturas, setFacturas]     = useState<Factura[]>([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState('');
-  const [selects, setSelects]       = useState<Record<string, string>>({});   // id → metodo elegido
-  const [processing, setProcessing] = useState<Record<string, boolean>>({});  // id → en proceso
+  const [noTable, setNoTable]       = useState(false);
+  const [selects, setSelects]       = useState<Record<string, string>>({});
+  const [processing, setProcessing] = useState<Record<string, boolean>>({});
   const [toast, setToast]           = useState('');
 
   // ── Cargar facturas ─────────────────────────────────────────────────────────
   const load = useCallback(async (d: string) => {
     setLoading(true);
     setError('');
+    setNoTable(false);
     try {
-      const res  = await fetch(`/api/conciliacion?date=${d}`, { cache: 'no-store' });
+      // Si d está vacío (primera carga), dejar que la API resuelva la fecha operativa
+      const url = d ? `/api/conciliacion?date=${d}` : '/api/conciliacion';
+      const res  = await fetch(url, { cache: 'no-store' });
       const data = await res.json();
       if (data.ok) {
         setFacturas(data.facturas);
+        // La API devuelve la fecha resuelta (respetando ventana 6am)
+        if (data.fecha && !d) setFecha(data.fecha);
         // Pre-cargar selects con el método ya guardado (si existe)
         const init: Record<string, string> = {};
         data.facturas.forEach((f: Factura) => {
           if (f.metodo_pago) init[f.id] = f.metodo_pago;
         });
         setSelects(prev => ({ ...init, ...prev }));
+      } else if (data.noTable) {
+        setNoTable(true);
       } else {
         setError(data.error ?? 'Error al cargar datos');
       }
@@ -68,7 +76,10 @@ export default function ConciliacionPage() {
     }
   }, []);
 
-  useEffect(() => { load(fecha); }, [fecha, load]);
+  // Primera carga: sin fecha para que la API resuelva la ventana operativa
+  useEffect(() => { load(''); }, [load]);
+  // Recargar cuando el usuario cambia la fecha manualmente
+  useEffect(() => { if (fecha) load(fecha); }, [fecha, load]);
 
   // ── Procesar factura ────────────────────────────────────────────────────────
   const procesar = async (id: string) => {
@@ -201,6 +212,28 @@ export default function ConciliacionPage() {
           <div style={{ padding: '48px', textAlign: 'center', color: '#475569' }}>
             <div className="animate-spin" style={{ width: '32px', height: '32px', border: '3px solid rgba(99,102,241,0.2)', borderTopColor: '#6366f1', borderRadius: '50%', margin: '0 auto 12px' }} />
             <p style={{ fontSize: '13px' }}>Cargando facturas…</p>
+          </div>
+        ) : noTable ? (
+          <div style={{ padding: '48px', textAlign: 'center' }}>
+            <p style={{ fontSize: '36px', marginBottom: '12px' }}>🗄️</p>
+            <p style={{ color: '#fbbf24', fontSize: '14px', fontWeight: '700', marginBottom: '8px' }}>Tabla pskloud_facturas no encontrada</p>
+            <p style={{ color: '#475569', fontSize: '12px', marginBottom: '16px' }}>Ejecuta el siguiente SQL en <strong style={{color:'#818cf8'}}>Supabase → SQL Editor</strong>:</p>
+            <div style={{ background: 'rgba(0,0,0,0.4)', borderRadius: '10px', padding: '16px', textAlign: 'left', fontSize: '11px', fontFamily: 'monospace', color: '#34d399', maxWidth: '600px', margin: '0 auto', lineHeight: 1.6 }}>
+              {`CREATE TABLE IF NOT EXISTS pskloud_facturas (
+  id             uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  fecha          date NOT NULL,
+  documento      varchar NOT NULL,
+  nombre_cliente varchar DEFAULT 'CLIENTE GENERAL',
+  monto_bs       numeric DEFAULT 0,
+  tipo_doc       varchar DEFAULT 'FAC',
+  metodo_pago    varchar,
+  procesado      boolean DEFAULT false,
+  procesado_at   timestamptz,
+  created_at     timestamptz DEFAULT now(),
+  UNIQUE(fecha, documento)
+);`}
+            </div>
+            <p style={{ color: '#475569', fontSize: '11px', marginTop: '12px' }}>Luego ejecuta: <code style={{color:'#818cf8'}}>node sync-pskloud.js</code> en la PC local.</p>
           </div>
         ) : error ? (
           <div style={{ padding: '48px', textAlign: 'center' }}>
