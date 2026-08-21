@@ -73,7 +73,8 @@ export async function getTasaDelDia(force = false): Promise<number> {
       try {
         const res = await fetch('https://api.cotizave.com/v1/fx/rates/reference', {
           headers: { 'X-API-Key': apiKey },
-          cache: 'no-store'
+          cache: 'no-store',
+          signal: AbortSignal.timeout(4000)
         });
         if (res.ok) {
           const data = await res.json();

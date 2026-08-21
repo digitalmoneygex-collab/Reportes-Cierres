@@ -71,7 +71,7 @@ export default function Sidebar() {
   useEffect(() => {
     const check = async () => {
       try {
-        const res = await fetch('/api/evolution/status', { cache: 'no-store' });
+        const res = await fetch('/api/evolution/status', { cache: 'no-store', signal: AbortSignal.timeout(8000) });
         const data = await res.json();
         const status = data.instances?.[0]?.connectionStatus as string | undefined;
         setWaState(status === 'open' ? 'open' : status === 'connecting' ? 'connecting' : 'offline');

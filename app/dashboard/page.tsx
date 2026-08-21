@@ -55,7 +55,7 @@ export default function DashboardPage() {
 
   const loadTasa = useCallback(async () => {
     try {
-      const res = await fetch('/api/tasa', { cache: 'no-store' });
+      const res = await fetch('/api/tasa', { cache: 'no-store', signal: AbortSignal.timeout(8000) });
       const json = await res.json();
       if (json.ok && json.tasa) setTasa(json.tasa);
     } catch { /* silent */ }
@@ -64,7 +64,7 @@ export default function DashboardPage() {
   const loadPagos = useCallback(async (dateFilter?: string) => {
     try {
       const qs = dateFilter ? `&date=${dateFilter}` : '';
-      const res  = await fetch(`/api/pagos?limit=50${qs}`, { cache: 'no-store' });
+      const res  = await fetch(`/api/pagos?limit=50${qs}`, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
       const json = await res.json() as { ok: boolean; data: Pago[] };
       if (json.ok && json.data) {
         const fresh = json.data;
@@ -83,7 +83,7 @@ export default function DashboardPage() {
 
   const loadWA = useCallback(async () => {
     try {
-      const res  = await fetch('/api/evolution/status', { cache: 'no-store' });
+      const res  = await fetch('/api/evolution/status', { cache: 'no-store', signal: AbortSignal.timeout(8000) });
       const json = await res.json() as { ok: boolean; instances?: WaInstance[] };
       if (json.ok && json.instances?.[0]) setWaInst(json.instances[0]);
     } catch { /* silent */ }
@@ -92,7 +92,7 @@ export default function DashboardPage() {
   const loadPskloud = useCallback(async (dateFilter?: string) => {
     try {
       const qs = dateFilter ? `?date=${dateFilter}` : '';
-      const res = await fetch(`/api/pskloud/resumen${qs}`, { cache: 'no-store' });
+      const res = await fetch(`/api/pskloud/resumen${qs}`, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
       const json = await res.json();
       if (json.ok) setPskloudData(json);
     } catch { /* silent */ }
