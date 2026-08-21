@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { readPaymentReceiptImage } from '@/lib/gemini';
+import { readPaymentReceipt } from '@/lib/gemini';
 import { getTasaDelDia } from '@/lib/tasa';
 
 const EVOLUTION_URL = (process.env.SERVER_URL ?? 'http://144.126.129.154:8081').replace(/\/$/, '');
@@ -132,10 +132,18 @@ export async function POST(request: Request) {
       });
     }
 
-    // 4. Solo imágenes
+    // 4. Determinar si es imagen o texto (comprobante)
     const isImage = !!messageContent?.imageMessage;
-    if (!isImage) {
-      return NextResponse.json({ ok: true, ignored: 'No es una imagen' });
+    const textMsg = messageContent?.conversation || messageContent?.extendedTextMessage?.text || '';
+    
+    const textLower = textMsg.toLowerCase();
+    const isReceiptText = !isImage && textMsg && (
+      (textLower.includes('referencia') || textLower.includes('ref')) && 
+      (textLower.includes('monto') || textLower.includes('bs'))
+    );
+
+    if (!isImage && !isReceiptText) {
+      return NextResponse.json({ ok: true, ignored: 'No es imagen ni comprobante de texto' });
     }
 
     // 5. Detección rápida de duplicado por message_id (antes de llamar a Gemini)
@@ -151,34 +159,37 @@ export async function POST(request: Request) {
       }
     }
 
-    // 6. Descargar imagen en Base64 desde Evolution API
-    const downloadRes = await fetch(
-      `${EVOLUTION_URL}/chat/getBase64FromMediaMessage/${instanceName}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_KEY },
-        body: JSON.stringify({ message: msgItem.key ? msgItem : msgData })
+    // 6. Descargar imagen en Base64 desde Evolution API (solo si es imagen)
+    let base64 = null;
+    if (isImage) {
+      const downloadRes = await fetch(
+        `${EVOLUTION_URL}/chat/getBase64FromMediaMessage/${instanceName}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_KEY },
+          body: JSON.stringify({ message: msgItem.key ? msgItem : msgData })
+        }
+      );
+
+      if (!downloadRes.ok) {
+        console.error('Error descargando imagen:', await downloadRes.text());
+        return NextResponse.json({ ok: false, error: 'Error al obtener base64' });
       }
-    );
 
-    if (!downloadRes.ok) {
-      console.error('Error descargando imagen:', await downloadRes.text());
-      return NextResponse.json({ ok: false, error: 'Error al obtener base64' });
+      const dlJson = await downloadRes.json();
+      base64 = dlJson.base64 ?? dlJson.data?.base64 ?? '';
+      if (!base64) {
+        return NextResponse.json({ ok: false, error: 'Base64 vacío' });
+      }
     }
 
-    const dlJson = await downloadRes.json();
-    const base64 = dlJson.base64 ?? dlJson.data?.base64 ?? '';
-    if (!base64) {
-      return NextResponse.json({ ok: false, error: 'Base64 vacío' });
-    }
-
-    // 7. OCR con Gemini
+    // 7. OCR o extracción con Gemini
     let extractedData;
     try {
-      extractedData = await readPaymentReceiptImage(base64);
+      extractedData = await readPaymentReceipt(base64, isReceiptText ? textMsg : null);
     } catch (ocrError: unknown) {
       console.error('Error en Gemini OCR:', ocrError);
-      return NextResponse.json({ ok: false, error: 'Fallo al procesar imagen con IA' });
+      return NextResponse.json({ ok: false, error: 'Fallo al procesar comprobante con IA' });
     }
 
     // 8. Detección de duplicado por referencia bancaria (segunda capa)

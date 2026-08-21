@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { readPaymentReceiptImage } from '@/lib/gemini';
+import { readPaymentReceipt } from '@/lib/gemini';
 import { getTasaDelDia } from '@/lib/tasa';
 
 const EVOLUTION_URL = (process.env.SERVER_URL ?? 'http://144.126.129.154:8081').replace(/\/$/, '');
@@ -81,11 +81,21 @@ export async function POST(request: Request) {
       console.log(`[Sync] Sin registros previos hoy — procesando todo el día`);
     }
 
-    // 4. Filtrar: solo imágenes, dentro del rango horario Venezuela y del receptor
+    // 4. Filtrar: imágenes o textos (comprobantes), dentro del rango horario Venezuela y del receptor
     const eligible = messages.filter(msg => {
       const jid = (msg.key.remoteJid || '') + (msg.key.remoteJidAlt || '');
       if (cleanReceptor && !jid.includes(cleanReceptor)) return false;
-      if (!msg.message?.imageMessage) return false;
+      
+      const isImage = !!msg.message?.imageMessage;
+      const textMsg = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
+      const textLower = textMsg.toLowerCase();
+      const isReceiptText = !isImage && textMsg && (
+        (textLower.includes('referencia') || textLower.includes('ref')) && 
+        (textLower.includes('monto') || textLower.includes('bs'))
+      );
+
+      if (!isImage && !isReceiptText) return false;
+
       const rawTs = msg.messageTimestamp;
       const msgDate = new Date(rawTs < 1e12 ? rawTs * 1000 : rawTs);
       // Solo mensajes de hoy en Venezuela
@@ -112,29 +122,35 @@ export async function POST(request: Request) {
         .maybeSingle();
       if (existing) { duplicados++; continue; }
 
-      // Descargar imagen
-      const dlRes = await fetch(`${EVOLUTION_URL}/chat/getBase64FromMediaMessage/${instanceName}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_KEY },
-        body: JSON.stringify({ message: msg })
-      });
-      if (!dlRes.ok) { 
-        errores++; 
-        errorDetails.push(`Evolution HTTP ${dlRes.status}: ${await dlRes.text()}`);
-        continue; 
-      }
-      const dlJson = await dlRes.json();
-      const base64 = dlJson.base64 ?? dlJson.data?.base64 ?? '';
-      if (!base64) { 
-        errores++; 
-        errorDetails.push(`No base64 returned by Evolution`);
-        continue; 
+      const isImage = !!msg.message?.imageMessage;
+      const textMsg = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
+
+      // Descargar imagen solo si es imagen
+      let base64 = null;
+      if (isImage) {
+        const dlRes = await fetch(`${EVOLUTION_URL}/chat/getBase64FromMediaMessage/${instanceName}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_KEY },
+          body: JSON.stringify({ message: msg })
+        });
+        if (!dlRes.ok) { 
+          errores++; 
+          errorDetails.push(`Evolution HTTP ${dlRes.status}: ${await dlRes.text()}`);
+          continue; 
+        }
+        const dlJson = await dlRes.json();
+        base64 = dlJson.base64 ?? dlJson.data?.base64 ?? '';
+        if (!base64) { 
+          errores++; 
+          errorDetails.push(`No base64 returned by Evolution`);
+          continue; 
+        }
       }
 
-      // OCR
+      // OCR o extracción
       let extractedData;
       try { 
-        extractedData = await readPaymentReceiptImage(base64); 
+        extractedData = await readPaymentReceipt(base64, !isImage ? textMsg : null); 
       }
       catch (err: any) { 
         errores++; 
