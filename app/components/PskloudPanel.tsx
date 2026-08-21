@@ -31,7 +31,21 @@ interface PskloudData {
     totalesInsumos: Record<string, number>;
   };
   reposteria: { items: RepoItem[]; total: number };
+  metodosPago?: { metodo: string; cantidad: number; totalBs: number }[];
 }
+
+const METODOS_PAGO_LABELS: Record<string, string> = {
+  punto_venta: '💳 Punto de Venta',
+  dolares_efectivo: '💵 Dólares Efectivo',
+  bs_efectivo: '💴 Bs Efectivo',
+  transferencia: '🏦 Transferencia',
+  pago_movil: '📱 Pago Móvil',
+  credito: '📋 Crédito',
+  binance: '🟡 Binance',
+  zelle: '💸 Zelle',
+  bio_pago: '🔵 Bio Pago',
+  devolucion: '↩️ Devolución',
+};
 
 // ─── Sub-components ───────────────────────────────────────
 function SVal({ v, suffix = '' }: { v: number | null; suffix?: string }) {
@@ -131,7 +145,7 @@ export default function PskloudPanel({ data, loading }: { data: PskloudData | nu
     );
   }
 
-  const { corteCaja, burguer, pasteles, reposteria } = data;
+  const { corteCaja, burguer, pasteles, reposteria, metodosPago } = data;
 
   const burguerInsumosKeys = ["PAN BURGUER", "PAN PERRO", "SALCHICHA", "CARNE H", "POLLO", "CARNE M", "TAPA P", "AREPA C", "HUEVO", "BEBIDA", "PAPAS FRITAS 150GR"];
 
@@ -191,6 +205,30 @@ export default function PskloudPanel({ data, loading }: { data: PskloudData | nu
 
         <Divider />
         <Row label="Tasa BCV" value={`Bs. ${corteCaja?.tasa?.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || 0}`} color="#fbbf24" bold />
+
+        {/* ── Métodos de Pago ── */}
+        {metodosPago && metodosPago.length > 0 && (
+          <div style={{ marginTop: '16px', background: 'rgba(99,102,241,0.05)', borderRadius: '8px', padding: '12px', border: '1px solid rgba(99,102,241,0.1)' }}>
+            <SectionTitle icon="💰">Desglose por Pago</SectionTitle>
+            <Divider />
+            {metodosPago.map((m, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0' }}>
+                <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                  {METODOS_PAGO_LABELS[m.metodo] || m.metodo} <span style={{ color: '#475569', fontSize: '10px' }}>({m.cantidad})</span>
+                </span>
+                <span style={{ fontSize: '12px', color: '#e8edf5', fontWeight: '600' }}>
+                  {fmtBs(m.totalBs)}
+                </span>
+              </div>
+            ))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0 4px', borderTop: '1px solid rgba(148,163,184,0.15)', marginTop: '6px' }}>
+              <span style={{ fontSize: '11px', color: '#818cf8', fontWeight: '800' }}>VENTAS TOTALES</span>
+              <span style={{ fontSize: '13px', color: '#818cf8', fontWeight: '800' }}>
+                {fmtBs(metodosPago.reduce((acc, curr) => acc + curr.totalBs, 0))}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Burguer ── */}

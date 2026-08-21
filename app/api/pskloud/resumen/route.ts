@@ -47,7 +47,7 @@ export async function GET(request: Request) {
     }
 
     // Buscar el snapshot más reciente dentro del rango lógico del día
-    const [{ data, error }, tasaResult] = await Promise.all([
+    const [{ data, error }, tasaResult, facturasResult] = await Promise.all([
       supabaseAdmin
         .from('pskloud_snapshot')
         .select('*')
@@ -57,6 +57,12 @@ export async function GET(request: Request) {
         .limit(1)
         .maybeSingle(),
       getTasaDelDia().catch(() => 0), // Si falla la tasa, usar 0 sin romper el route
+      supabaseAdmin
+        .from('pskloud_facturas')
+        .select('metodo_pago, monto_bs, tipo_doc')
+        .gte('procesado_at', start.toISOString())
+        .lte('procesado_at', end.toISOString())
+        .eq('procesado', true)
     ]);
 
     if (error) {
@@ -104,6 +110,18 @@ export async function GET(request: Request) {
         // Alias legacy para compatibilidad
         totalUsd: totalRecibidoUsd,
       },
+      metodosPago: (facturasResult.data ?? []).reduce((acc: any, curr) => {
+        if (!curr.metodo_pago) return acc;
+        const exists = acc.find((m: any) => m.metodo === curr.metodo_pago);
+        const monto = curr.tipo_doc === 'DEV' ? -Number(curr.monto_bs) : Number(curr.monto_bs);
+        if (exists) {
+          exists.cantidad += 1;
+          exists.totalBs += monto;
+        } else {
+          acc.push({ metodo: curr.metodo_pago, cantidad: 1, totalBs: monto });
+        }
+        return acc;
+      }, []),
       burguer:    data.burguer,
       pasteles:   data.pasteles,
       tequeños:   data.teques,
