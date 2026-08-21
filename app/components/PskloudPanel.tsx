@@ -216,15 +216,29 @@ export default function PskloudPanel({ data, loading }: { data: PskloudData | nu
                 <span style={{ fontSize: '11px', color: '#94a3b8' }}>
                   {METODOS_PAGO_LABELS[m.metodo] || m.metodo} <span style={{ color: '#475569', fontSize: '10px' }}>({m.cantidad})</span>
                 </span>
-                <span style={{ fontSize: '12px', color: '#e8edf5', fontWeight: '600' }}>
-                  {fmtBs(m.totalBs)}
+                <span style={{ textAlign: 'right' }}>
+                  <span style={{ display: 'block', fontSize: '12px', color: '#e8edf5', fontWeight: '600' }}>
+                    {fmtBs(m.totalBs)}
+                  </span>
+                  {corteCaja?.tasa > 0 && (
+                    <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>
+                      $ {(m.totalBs / corteCaja.tasa).toFixed(2)} USD
+                    </span>
+                  )}
                 </span>
               </div>
             ))}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0 4px', borderTop: '1px solid rgba(148,163,184,0.15)', marginTop: '6px' }}>
               <span style={{ fontSize: '11px', color: '#818cf8', fontWeight: '800' }}>VENTAS TOTALES</span>
-              <span style={{ fontSize: '13px', color: '#818cf8', fontWeight: '800' }}>
-                {fmtBs(metodosPago.reduce((acc, curr) => acc + curr.totalBs, 0))}
+              <span style={{ textAlign: 'right' }}>
+                <span style={{ display: 'block', fontSize: '13px', color: '#818cf8', fontWeight: '800' }}>
+                  {fmtBs(metodosPago.reduce((acc, curr) => acc + curr.totalBs, 0))}
+                </span>
+                {corteCaja?.tasa > 0 && (
+                  <span style={{ display: 'block', fontSize: '11px', color: '#a5b4fc' }}>
+                    $ {(metodosPago.reduce((acc, curr) => acc + curr.totalBs, 0) / corteCaja.tasa).toFixed(2)} USD
+                  </span>
+                )}
               </span>
             </div>
           </div>
