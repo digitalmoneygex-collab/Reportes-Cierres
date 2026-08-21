@@ -235,7 +235,7 @@ export default function ShiftPreviewModal({
                 <button 
                   className="btn" 
                   style={{ background: '#ef4444', color: 'white', border: 'none' }}
-                  onClick={() => {
+                  onClick={async () => {
                     // Generar PDF y Descargar
                     if (data) {
                       try {
@@ -253,10 +253,10 @@ export default function ShiftPreviewModal({
                         });
                       } catch (err) {
                         console.error('Error generando PDF:', err);
-                        alert('El turno se cerró, pero hubo un error generando el PDF.');
+                        alert('Hubo un error generando el PDF, pero el turno se cerrará de todos modos.');
                       }
                     }
-                    onConfirm();
+                    await onConfirm();
                     onClose();
                   }}
                 >
