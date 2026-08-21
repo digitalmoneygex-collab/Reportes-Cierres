@@ -25,7 +25,14 @@ const METODOS_PAGO = [
   { value: 'binance',          label: '🟡 Binance' },
   { value: 'zelle',            label: '💸 Zelle' },
   { value: 'bio_pago',         label: '🔵 Bio Pago' },
-  { value: 'devolucion',       label: '↩️ Devolución' },
+  { value: 'dev_punto_venta',      label: '↩️ Dev. Punto de Venta' },
+  { value: 'dev_pago_movil',       label: '↩️ Dev. Pago Móvil' },
+  { value: 'dev_bs_efectivo',      label: '↩️ Dev. Bs Efectivo' },
+  { value: 'dev_dolares_efectivo', label: '↩️ Dev. Dólares Efect.' },
+  { value: 'dev_transferencia',    label: '↩️ Dev. Transferencia' },
+  { value: 'dev_binance',          label: '↩️ Dev. Binance' },
+  { value: 'dev_zelle',            label: '↩️ Dev. Zelle' },
+  { value: 'dev_bio_pago',         label: '↩️ Dev. Bio Pago' },
 ];
 
 const fmtBs = (v: number) =>

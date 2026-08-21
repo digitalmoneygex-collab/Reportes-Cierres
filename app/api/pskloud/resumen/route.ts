@@ -112,16 +112,25 @@ export async function GET(request: Request) {
       },
       metodosPago: (facturasResult.data ?? []).reduce((acc: any, curr) => {
         if (!curr.metodo_pago) return acc;
-        const exists = acc.find((m: any) => m.metodo === curr.metodo_pago);
         
-        const isNegative = curr.tipo_doc === 'DEV' || curr.tipo_doc === 'N/C' || curr.tipo_doc === 'NC' || curr.metodo_pago === 'devolucion';
+        let metodoPagoReal = curr.metodo_pago;
+        let isDevolucionManual = false;
+
+        if (curr.metodo_pago.startsWith('dev_')) {
+          metodoPagoReal = curr.metodo_pago.replace('dev_', '');
+          isDevolucionManual = true;
+        }
+
+        const exists = acc.find((m: any) => m.metodo === metodoPagoReal);
+        
+        const isNegative = curr.tipo_doc === 'DEV' || curr.tipo_doc === 'N/C' || curr.tipo_doc === 'NC' || isDevolucionManual || curr.metodo_pago === 'devolucion';
         const monto = isNegative ? -Math.abs(Number(curr.monto_bs)) : Math.abs(Number(curr.monto_bs));
 
         if (exists) {
           exists.cantidad += 1;
           exists.totalBs += monto;
         } else {
-          acc.push({ metodo: curr.metodo_pago, cantidad: 1, totalBs: monto });
+          acc.push({ metodo: metodoPagoReal, cantidad: 1, totalBs: monto });
         }
         return acc;
       }, []),
