@@ -172,15 +172,19 @@ async function sync() {
     );
     const totalBs = Number(totalRow?.total ?? 0);
 
+    // Debug: ver qué tipodoc hay realmente hoy
+    const [tiposDoc] = await conn.query(
+      `SELECT DISTINCT tipodoc FROM operclit WHERE DATE(fecha) = ?`,
+      [today]
+    );
+    console.log(`  INFO Tipos de documento encontrados hoy en operclit:`, tiposDoc.map(r => r.tipodoc).join(', '));
+
     // ── Devoluciones en Efectivo ───────────────────────────────
-    // PSKloud registra las devoluciones con tipodoc = 'DEV'.
-    // Solo contamos las que se devolvieron en efectivo (formapago = 'EFE' o similar).
-    // El monto en operclit para DEV puede ser positivo; lo restamos del ingreso.
     const [[devRow]] = await conn.query(
       `SELECT COALESCE(SUM(monto), 0) AS total_dev
        FROM operclit
        WHERE DATE(fecha) = ?
-         AND tipodoc IN ('DEV', 'N/C')`,
+         AND tipodoc IN ('DEV', 'N/C', 'NC')`,
       [today]
     );
     const devolucionesEfectivoBs = Number(devRow?.total_dev ?? 0);
@@ -271,7 +275,7 @@ async function sync() {
            oc.tipodoc    AS tipo_doc
          FROM operclit oc
          WHERE DATE(oc.fecha) = ?
-           AND oc.tipodoc IN ('FAC','DEV','N/C')
+           AND oc.tipodoc IN ('FAC','DEV','N/C','NC')
          ORDER BY ${selectDoc}`,
         [today]
       );
