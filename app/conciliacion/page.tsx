@@ -54,6 +54,7 @@ export default function ConciliacionPage() {
   const [isSupervisor, setIsSupervisor] = useState(false);
   const [turnoActivo, setTurnoActivo] = useState<any>(null);
   const [turnoLoaded, setTurnoLoaded] = useState(false);
+  const [checkedRows, setCheckedRows] = useState<Set<string>>(new Set());
 
   // ── Filtros locales ─────────────────────────────────────────────────────────
   const [fMetodo, setFMetodo]   = useState('todos');       // método de pago
@@ -411,12 +412,13 @@ export default function ConciliacionPage() {
         {/* Table header */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: '100px 1fr 110px 140px 200px 130px',
+          gridTemplateColumns: '30px 100px 1fr 110px 140px 200px 130px',
           gap: '0',
           background: 'rgba(30,41,59,0.8)',
           borderBottom: '1px solid rgba(148,163,184,0.1)',
           padding: '12px 16px',
         }}>
+          <span /> {/* Espacio para el checkbox */}
           {['Documento', 'Cliente', 'Tipo', 'Monto Bs', 'Método de Pago', 'Acción'].map(h => (
             <span key={h} style={{ fontSize: '10px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
               {h}
@@ -484,7 +486,7 @@ export default function ConciliacionPage() {
                   key={f.id}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '100px 1fr 110px 140px 200px 130px',
+                    gridTemplateColumns: '30px 100px 1fr 110px 140px 200px 130px',
                     gap: '0',
                     padding: '11px 16px',
                     borderBottom: '1px solid rgba(148,163,184,0.06)',
@@ -495,6 +497,23 @@ export default function ConciliacionPage() {
                     transition: 'background 0.15s',
                   }}
                 >
+                  {/* Check visual de auditoría */}
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={checkedRows.has(f.id)}
+                      onChange={(e) => {
+                        const newSet = new Set(checkedRows);
+                        if (e.target.checked) newSet.add(f.id);
+                        else newSet.delete(f.id);
+                        setCheckedRows(newSet);
+                      }}
+                      style={{
+                        cursor: 'pointer', width: '16px', height: '16px', accentColor: '#34d399'
+                      }}
+                    />
+                  </div>
+
                   {/* Documento */}
                   <span style={{ fontSize: '12px', fontFamily: 'monospace', color: '#818cf8', fontWeight: '700' }}>
                     {f.documento}
