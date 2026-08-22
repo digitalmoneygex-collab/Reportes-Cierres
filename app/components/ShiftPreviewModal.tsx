@@ -166,17 +166,31 @@ export default function ShiftPreviewModal({
                         <span style={{ color: isDev ? '#fca5a5' : '#cbd5e1' }}>
                           {isDev ? '⚠️ ' : ''}{METODOS_LABELS[m.metodo] || m.metodo} <span style={{ color: '#475569' }}>({m.cantidad})</span>
                         </span>
-                        <span style={{ color: isDev ? '#fca5a5' : '#e8edf5', fontWeight: 'bold', fontFamily: 'monospace', fontSize: '11px' }}>
-                          Bs. {m.totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                        </span>
+                        <div style={{ textAlign: 'right' }}>
+                          <span style={{ display: 'block', color: isDev ? '#fca5a5' : '#e8edf5', fontWeight: 'bold', fontFamily: 'monospace', fontSize: '11px' }}>
+                            Bs. {m.totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                          </span>
+                          {data.pskloud.tasa > 0 && (
+                            <span style={{ display: 'block', fontSize: '9px', color: isDev ? '#fca5a5' : '#94a3b8' }}>
+                              ~ $ {(m.totalBs / data.pskloud.tasa).toFixed(2)} USD
+                            </span>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '6px', borderTop: '1px solid rgba(148,163,184,0.15)', marginTop: '2px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: '1px solid rgba(148,163,184,0.15)', marginTop: '2px' }}>
                     <span style={{ fontSize: '12px', color: '#818cf8', fontWeight: '800' }}>TOTAL</span>
-                    <span style={{ fontSize: '12px', color: '#818cf8', fontWeight: '800', fontFamily: 'monospace' }}>
-                      Bs. {data.metodosPago.reduce((a, c) => a + c.totalBs, 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                    </span>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ display: 'block', fontSize: '12px', color: '#818cf8', fontWeight: '800', fontFamily: 'monospace' }}>
+                        Bs. {data.metodosPago.reduce((a, c) => a + c.totalBs, 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                      </span>
+                      {data.pskloud.tasa > 0 && (
+                        <span style={{ display: 'block', fontSize: '10px', color: '#a5b4fc' }}>
+                          ~ $ {(data.metodosPago.reduce((a, c) => a + c.totalBs, 0) / data.pskloud.tasa).toFixed(2)} USD
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
