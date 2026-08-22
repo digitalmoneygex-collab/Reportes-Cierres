@@ -138,8 +138,13 @@ export async function POST(request: Request) {
     
     const textLower = textMsg.toLowerCase();
     const isReceiptText = !isImage && textMsg && (
-      (textLower.includes('referencia') || textLower.includes('ref')) && 
-      (textLower.includes('monto') || textLower.includes('bs'))
+      textLower.includes('bs') || 
+      textLower.includes('ves') || 
+      textLower.includes('pago movil') || 
+      textLower.includes('pagomovil') || 
+      textLower.includes('transferencia') || 
+      textLower.includes('ref') || 
+      textLower.includes('recibo')
     );
 
     if (!isImage && !isReceiptText) {

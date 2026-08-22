@@ -228,12 +228,12 @@ export default function DashboardPage() {
         </div>
 
         <div className="card">
-          <p className="label" style={{ marginBottom: '12px' }}>Capturas Móviles</p>
+          <p className="label" style={{ marginBottom: '12px' }}>Interceptados (Bot)</p>
           {loading ? <div className="skeleton" style={{ height: '36px', marginBottom: '6px' }} /> : <p style={{ fontSize: '36px', fontWeight: '900', color: '#34d399', letterSpacing: '-0.06em', lineHeight: 1 }}>{pagos.length}</p>}
         </div>
 
         <div className="card">
-          <p className="label" style={{ marginBottom: '12px' }}>Procesados (OCR)</p>
+          <p className="label" style={{ marginBottom: '12px' }}>Procesados (IA)</p>
           {loading ? <div className="skeleton" style={{ height: '36px', marginBottom: '6px' }} /> : <p style={{ fontSize: '36px', fontWeight: '900', color: '#22d3ee', letterSpacing: '-0.06em', lineHeight: 1 }}>{procesados}</p>}
         </div>
 
