@@ -13,6 +13,7 @@ type Factura = {
   metodo_pago: string | null;
   procesado: boolean;
   procesado_at: string | null;
+  auditoria_check?: boolean;
 };
 
 const METODOS_PAGO = [
@@ -89,10 +90,13 @@ export default function ConciliacionPage() {
         setFacturas(data.facturas);
         if (data.fecha && !d) setFecha(data.fecha);
         const init: Record<string, string> = {};
+        const initChecks = new Set<string>();
         data.facturas.forEach((f: Factura) => {
           if (f.metodo_pago) init[f.id] = f.metodo_pago;
+          if (f.auditoria_check) initChecks.add(f.id);
         });
         setSelects(prev => ({ ...init, ...prev }));
+        setCheckedRows(initChecks);
       } else if (data.noTable) {
         setNoTable(true);
       } else {
@@ -503,10 +507,16 @@ export default function ConciliacionPage() {
                       type="checkbox" 
                       checked={checkedRows.has(f.id)}
                       onChange={(e) => {
+                        const checked = e.target.checked;
                         const newSet = new Set(checkedRows);
-                        if (e.target.checked) newSet.add(f.id);
+                        if (checked) newSet.add(f.id);
                         else newSet.delete(f.id);
                         setCheckedRows(newSet);
+                        fetch('/api/conciliacion', {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ id: f.id, auditoria_check: checked })
+                        }).catch(() => {});
                       }}
                       style={{
                         cursor: 'pointer', width: '16px', height: '16px', accentColor: '#34d399'

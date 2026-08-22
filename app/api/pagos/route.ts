@@ -90,3 +90,30 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }
+
+// PATCH /api/pagos
+// Body: { id: string, auditoria_check: boolean }
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json();
+    const { id, auditoria_check } = body;
+
+    if (!id || auditoria_check === undefined) {
+      return NextResponse.json({ ok: false, error: 'Faltan campos: id y auditoria_check' }, { status: 400 });
+    }
+
+    const { error: updateErr } = await supabaseAdmin
+      .from('pagos_whatsapp')
+      .update({ auditoria_check })
+      .eq('id', id);
+
+    if (updateErr) {
+      return NextResponse.json({ ok: false, error: updateErr.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, message: 'Check actualizado' });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Error desconocido';
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
+}

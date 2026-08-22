@@ -112,10 +112,25 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json();
-    const { id, metodo_pago } = body;
+    const { id, metodo_pago, auditoria_check } = body;
 
-    if (!id || !metodo_pago) {
-      return NextResponse.json({ ok: false, error: 'Faltan campos: id y metodo_pago' }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ ok: false, error: 'Falta campo: id' }, { status: 400 });
+    }
+
+    // Modo solo actualización de check de auditoría
+    if (auditoria_check !== undefined) {
+      const { error: updateErr } = await supabaseAdmin
+        .from('pskloud_facturas')
+        .update({ auditoria_check })
+        .eq('id', id);
+
+      if (updateErr) return NextResponse.json({ ok: false, error: updateErr.message }, { status: 500 });
+      return NextResponse.json({ ok: true, message: 'Check actualizado' });
+    }
+
+    if (!metodo_pago) {
+      return NextResponse.json({ ok: false, error: 'Faltan campos: metodo_pago' }, { status: 400 });
     }
 
     // Verificar que no esté ya procesada

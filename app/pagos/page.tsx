@@ -13,6 +13,7 @@ type Pago = {
   metodo: string;
   imagen_url: string;
   procesado: boolean;
+  auditoria_check?: boolean;
 };
 
 const BANCOS = ['Todos', 'Mercantil', 'Banesco', 'Banco de Venezuela', 'Daviplata', 'Nequi', 'Bancolombia', 'Banco de Bogotá'];
@@ -54,7 +55,14 @@ export default function PagosPage() {
 
       const res  = await fetch(`/api/pagos?${params}`, { cache: 'no-store' });
       const json = await res.json() as { ok: boolean; data: Pago[] };
-      if (json.ok) setPagos(json.data ?? []);
+      if (json.ok) {
+        setPagos(json.data ?? []);
+        const initChecks = new Set<string>();
+        (json.data ?? []).forEach(p => {
+          if (p.auditoria_check) initChecks.add(p.id);
+        });
+        setCheckedRows(initChecks);
+      }
     } catch { /* silent */ }
     setLoading(false);
   }, [filterDate, filterBanco, search]);
@@ -194,10 +202,16 @@ export default function PagosPage() {
                             type="checkbox" 
                             checked={checkedRows.has(p.id)}
                             onChange={(e) => {
+                              const checked = e.target.checked;
                               const newSet = new Set(checkedRows);
-                              if (e.target.checked) newSet.add(p.id);
+                              if (checked) newSet.add(p.id);
                               else newSet.delete(p.id);
                               setCheckedRows(newSet);
+                              fetch('/api/pagos', {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ id: p.id, auditoria_check: checked })
+                              }).catch(() => {});
                             }}
                             style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#34d399' }}
                           />
