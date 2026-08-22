@@ -19,6 +19,10 @@ type PreviewData = {
     pasteles: { nombre: string; cantidad: number }[];
     reposteria: { nombre: string; cantidad: number }[];
   };
+  insumos?: {
+    burguer:  Record<string, number>;
+    pasteles: Record<string, number>;
+  };
 };
 
 export default function ShiftPreviewModal({ 
@@ -92,7 +96,7 @@ export default function ShiftPreviewModal({
       backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex',
       alignItems: 'center', justifyContent: 'center', padding: '20px'
     }}>
-      <div className="card" style={{ maxWidth: '600px', width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative', animation: 'fade-in 0.2s ease-out' }}>
+      <div className="card" style={{ maxWidth: '1100px', width: '100%', maxHeight: '92vh', overflowY: 'auto', position: 'relative', animation: 'fade-in 0.2s ease-out' }}>
         <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#e8edf5', marginBottom: '16px' }}>Vista Previa de Cierre</h2>
         
         {loading ? (
@@ -101,7 +105,8 @@ export default function ShiftPreviewModal({
           <div style={{ color: '#ef4444', padding: '20px', background: 'rgba(239,68,68,0.1)', borderRadius: '8px' }}>{error}</div>
         ) : data ? (
           <div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px', marginBottom: '20px' }}>
+            {/* Top: 3 columnas */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.4fr', gap: '12px', marginBottom: '20px' }}>
               
               {/* Bloque PSKLOUD con más detalles */}
               <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -149,49 +154,132 @@ export default function ShiftPreviewModal({
                 </div>
                 <p style={{ fontSize: '11px', color: '#64748b' }}>{data.pagos.registradosCount} Capturas recibidas</p>
               </div>
-            </div>
 
-            {/* Desglose por Método de Pago */}
-            {data.metodosPago && data.metodosPago.length > 0 && (
-              <div style={{ marginBottom: '24px', background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.1)', borderRadius: '8px', padding: '12px' }}>
-                <h3 style={{ fontSize: '13px', fontWeight: '700', color: '#a5b4fc', marginBottom: '8px' }}>Desglose por Vía de Pago</h3>
-                <div style={{ display: 'grid', gap: '8px' }}>
+              {/* Bloque Desglose Métodos inline */}
+              <div style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.1)', borderRadius: '8px', padding: '12px' }}>
+                <p style={{ fontSize: '13px', color: '#a5b4fc', fontWeight: 'bold', marginBottom: '8px' }}>Desglose por Vía de Pago</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                   {data.metodosPago.map((m, i) => {
                     const isDev = m.totalBs < 0 || m.metodo === 'gasto' || m.metodo === 'devolucion';
                     return (
                       <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
                         <span style={{ color: isDev ? '#fca5a5' : '#cbd5e1' }}>
-                          {isDev ? '⚠️ ' : ''}{METODOS_LABELS[m.metodo] || m.metodo} ({m.cantidad})
+                          {isDev ? '⚠️ ' : ''}{METODOS_LABELS[m.metodo] || m.metodo} <span style={{ color: '#475569' }}>({m.cantidad})</span>
                         </span>
-                        <div style={{ textAlign: 'right' }}>
-                          <span style={{ display: 'block', color: isDev ? '#fca5a5' : '#e8edf5', fontWeight: 'bold' }}>
-                            Bs. {m.totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                          </span>
-                          {data.pskloud.tasa > 0 && (
-                            <span style={{ display: 'block', fontSize: '10px', color: isDev ? '#fca5a5' : '#94a3b8' }}>
-                              $ {(m.totalBs / data.pskloud.tasa).toFixed(2)} USD
-                            </span>
-                          )}
-                        </div>
+                        <span style={{ color: isDev ? '#fca5a5' : '#e8edf5', fontWeight: 'bold', fontFamily: 'monospace', fontSize: '11px' }}>
+                          Bs. {m.totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                        </span>
                       </div>
                     );
                   })}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0 4px', borderTop: '1px solid rgba(148,163,184,0.15)', marginTop: '4px' }}>
-                    <span style={{ fontSize: '12px', color: '#818cf8', fontWeight: '800' }}>VENTAS TOTALES</span>
-                    <div style={{ textAlign: 'right' }}>
-                      <span style={{ display: 'block', fontSize: '13px', color: '#818cf8', fontWeight: '800' }}>
-                        Bs. {data.metodosPago.reduce((acc, curr) => acc + curr.totalBs, 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                      </span>
-                      {data.pskloud.tasa > 0 && (
-                        <span style={{ display: 'block', fontSize: '11px', color: '#a5b4fc' }}>
-                          $ {(data.metodosPago.reduce((acc, curr) => acc + curr.totalBs, 0) / data.pskloud.tasa).toFixed(2)} USD
-                        </span>
-                      )}
-                    </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '6px', borderTop: '1px solid rgba(148,163,184,0.15)', marginTop: '2px' }}>
+                    <span style={{ fontSize: '12px', color: '#818cf8', fontWeight: '800' }}>TOTAL</span>
+                    <span style={{ fontSize: '12px', color: '#818cf8', fontWeight: '800', fontFamily: 'monospace' }}>
+                      Bs. {data.metodosPago.reduce((a, c) => a + c.totalBs, 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                    </span>
                   </div>
                 </div>
               </div>
-            )}
+            </div>
+
+            {/* ─── Sección Piezas Vendidas ───────────────────────────────── */}
+            {(() => {
+              const burguerItems = (data.articulos?.burguer || []).filter(i => i.cantidad > 0);
+              const pastelesItems = (data.articulos?.pasteles || []).filter(i => i.cantidad > 0);
+              const reposteriaItems = (data.articulos?.reposteria || []).filter(i => i.cantidad > 0);
+              const insumosB = (data as any).insumos?.burguer as Record<string, number> | undefined;
+              const insumosP = (data as any).insumos?.pasteles as Record<string, number> | undefined;
+
+              // Combinar insumos
+              const todosInsumos: Record<string, number> = {};
+              Object.entries(insumosB || {}).forEach(([k, v]) => { todosInsumos[k] = (todosInsumos[k] || 0) + v; });
+              Object.entries(insumosP || {}).forEach(([k, v]) => { todosInsumos[k] = (todosInsumos[k] || 0) + v; });
+              const INSUMOS_ORDER = ['Pieza G', 'Pieza P', 'Pieza F', 'Carne H', 'Pollo', 'Pan Burguer', 'Pan perro', 'Salchicha', 'Arepa C', 'Carne M', 'Huevo', 'Bebida'];
+              const insumosOrdenados = INSUMOS_ORDER.filter(k => (todosInsumos[k] || 0) > 0).map(k => ({ nombre: k, cantidad: todosInsumos[k] }));
+
+              const hayPiezas = burguerItems.length > 0 || pastelesItems.length > 0 || reposteriaItems.length > 0;
+
+              if (!hayPiezas && insumosOrdenados.length === 0) return null;
+
+              return (
+                <div style={{ marginBottom: '20px', background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.12)', borderRadius: '10px', padding: '14px' }}>
+                  <h3 style={{ fontSize: '13px', fontWeight: '700', color: '#6ee7b7', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                    Piezas Vendidas
+                  </h3>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+
+                    {/* Burgers */}
+                    <div>
+                      <p style={{ fontSize: '10px', fontWeight: '800', color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>🍔 Burgers</p>
+                      {burguerItems.length === 0 ? (
+                        <p style={{ fontSize: '11px', color: '#334155', fontStyle: 'italic' }}>Sin ventas</p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          {burguerItems.map((item, i) => (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                              <span style={{ color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, marginRight: '6px' }}>{item.nombre}</span>
+                              <span style={{ color: '#fbbf24', fontWeight: '700', fontFamily: 'monospace', flexShrink: 0 }}>{item.cantidad}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Pasteles */}
+                    <div>
+                      <p style={{ fontSize: '10px', fontWeight: '800', color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>🥐 Pasteles / Tequeños</p>
+                      {pastelesItems.length === 0 ? (
+                        <p style={{ fontSize: '11px', color: '#334155', fontStyle: 'italic' }}>Sin ventas</p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          {pastelesItems.map((item, i) => (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                              <span style={{ color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, marginRight: '6px' }}>{item.nombre}</span>
+                              <span style={{ color: '#c4b5fd', fontWeight: '700', fontFamily: 'monospace', flexShrink: 0 }}>{item.cantidad}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Insumos Totales */}
+                    <div style={{ background: 'rgba(16,185,129,0.08)', borderRadius: '8px', padding: '10px' }}>
+                      <p style={{ fontSize: '10px', fontWeight: '800', color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Total Insumos</p>
+                      {insumosOrdenados.length === 0 ? (
+                        <p style={{ fontSize: '11px', color: '#334155', fontStyle: 'italic' }}>Sin datos</p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                          {insumosOrdenados.map((ins, i) => (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '11px', color: '#94a3b8' }}>{ins.nombre}</span>
+                              <span style={{
+                                fontSize: '14px', fontWeight: '900', fontFamily: 'monospace',
+                                color: ins.nombre.startsWith('Pieza') ? '#34d399' : ins.nombre.includes('Carne') ? '#f59e0b' : '#818cf8',
+                                background: 'rgba(0,0,0,0.2)', borderRadius: '5px', padding: '1px 8px',
+                              }}>{ins.cantidad}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {reposteriaItems.length > 0 && (
+                        <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(52,211,153,0.15)' }}>
+                          <p style={{ fontSize: '10px', color: '#475569', marginBottom: '4px', fontWeight: '600' }}>Repostería</p>
+                          {reposteriaItems.map((item, i) => (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                              <span style={{ color: '#64748b' }}>{item.nombre}</span>
+                              <span style={{ color: '#94a3b8', fontWeight: '700', fontFamily: 'monospace' }}>{item.cantidad}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+                </div>
+              );
+            })()}
 
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '16px', marginBottom: '24px' }}>
               <h3 style={{ fontSize: '14px', fontWeight: '700', color: '#e8edf5', marginBottom: '12px' }}>Estado de Conciliación</h3>
