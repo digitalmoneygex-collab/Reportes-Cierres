@@ -20,8 +20,19 @@ export type ShiftPdfData = {
   metodosPago: { metodo: string; cantidad: number; totalBs: number }[];
   pagos: { totalBs: number; registradosCount: number; procesadosCount: number };
   articulos: {
-    burguer: { nombre: string; cantidad: number }[];
-    pasteles: { nombre: string; cantidad: number }[];
+    burguer: {
+      combosHamb: { nombre: string; cantidad: number }[];
+      hambSueltas: { nombre: string; cantidad: number }[];
+      perros: { nombre: string; cantidad: number }[];
+      otros: { nombre: string; cantidad: number }[];
+    };
+    pasteles: {
+      pasapalos: { nombre: string; cantidad: number }[];
+      pequenos: { nombre: string; cantidad: number }[];
+      empanadas: { nombre: string; cantidad: number }[];
+      grandes: { nombre: string; cantidad: number }[];
+      otros: { nombre: string; cantidad: number }[];
+    };
     reposteria: { nombre: string; cantidad: number }[];
   };
   // Totales de insumos calculados con FACTORES
@@ -155,8 +166,8 @@ export function generateShiftReportPdf(data: ShiftPdfData) {
   doc.text('4. CONTEO DE PIEZAS VENDIDAS', 15, y);
   y += 6;
 
-  const drawGroupTable = (title: string, items: {nombre: string, cantidad: number}[], startY: number) => {
-    if (!items || items.length === 0) return startY;
+  const drawGroupTable = (title: string, bodyData: any[], startY: number) => {
+    if (!bodyData || bodyData.length === 0) return startY;
     let currentY = startY;
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
@@ -166,21 +177,78 @@ export function generateShiftReportPdf(data: ShiftPdfData) {
     autoTable(doc, {
       startY: currentY,
       head: [['Artículo', 'Cant.']],
-      body: items.map(i => [i.nombre, i.cantidad.toString()]),
+      body: bodyData,
       theme: 'plain',
-      styles: { cellPadding: 1, fontSize: 9 },
+      styles: { cellPadding: 2, fontSize: 9 },
       headStyles: { fillColor: [200, 200, 200], textColor: [0,0,0] },
-      margin: { left: 15, right: 100 } // Hacerla estrecha
+      margin: { left: 15, right: 100 }
     });
     // @ts-ignore
     return doc.lastAutoTable.finalY + 8;
   };
 
-  y = drawGroupTable('Burgers / Hamburguesas', data.articulos.burguer, y);
+  const getMultiplier = (nombre: string) => {
+    let mult = 1;
+    let match = nombre.match(/(\d+)/);
+    if (match) mult = parseInt(match[1]);
+    if (nombre.includes("25UND")) mult = 25;
+    if (nombre.includes("50UND") || nombre.includes("X50")) mult = 50;
+    if (nombre.includes("12")) mult = 12;
+    if (nombre.includes("6 PASTELES") || nombre.includes("6 TEQUEÑOS")) mult = 6;
+    return mult;
+  };
+
+  const buildSectionBody = (title: string, items: {nombre: string, cantidad: number}[], subtotalLabel: string) => {
+    if (!items || items.length === 0) return [];
+    let rows: any[] = [];
+    rows.push([{ content: title, colSpan: 2, styles: { fontStyle: 'bold', fillColor: [245, 245, 245], fontSize: 8, textColor: [100, 100, 100] } }]);
+    let subtotal = 0;
+    items.forEach(i => {
+      subtotal += i.cantidad;
+      let displayValue = i.cantidad.toString();
+      if (i.cantidad > 0) {
+        let mult = getMultiplier(i.nombre);
+        if (mult > 1 && (i.nombre.includes("COMBO") || i.nombre.includes("PASAPALOS") || i.nombre.includes("12"))) {
+          displayValue = `${i.cantidad} × ${mult} = ${i.cantidad * mult}`;
+        }
+      }
+      rows.push([i.nombre, displayValue]);
+    });
+    rows.push([{ content: subtotalLabel, styles: { fontStyle: 'bold' } }, { content: subtotal.toString(), styles: { fontStyle: 'bold' } }]);
+    return rows;
+  };
+
+  // Build Burguer Data
+  let burguerBody: any[] = [];
+  burguerBody = burguerBody.concat(buildSectionBody('COMBOS HAMBURGUESA', data.articulos.burguer.combosHamb, 'SUBTOTAL (Hamburguesas en combo)'));
+  burguerBody = burguerBody.concat(buildSectionBody('HAMBURGUESAS POR UNIDAD', data.articulos.burguer.hambSueltas, 'SUBTOTAL (Hamburguesas por unidad)'));
+  burguerBody = burguerBody.concat(buildSectionBody('PERROS CALIENTES', data.articulos.burguer.perros, 'SUBTOTAL (Perro Caliente)'));
+  burguerBody = burguerBody.concat(buildSectionBody('OTROS', data.articulos.burguer.otros, 'SUBTOTAL (Otros)'));
+  
+  // Build Pasteles Data
+  let pastelesBody: any[] = [];
+  pastelesBody = pastelesBody.concat(buildSectionBody('PASAPALOS DE FIESTA', data.articulos.pasteles.pasapalos, 'SUBTOTAL (Pasapalos)'));
+  pastelesBody = pastelesBody.concat(buildSectionBody('PASTELES PEQUEÑOS', data.articulos.pasteles.pequenos, 'SUBTOTAL (Pasteles Pequeños)'));
+  pastelesBody = pastelesBody.concat(buildSectionBody('EMPANADAS', data.articulos.pasteles.empanadas, 'SUBTOTAL (Empanadas)'));
+  pastelesBody = pastelesBody.concat(buildSectionBody('PASTEL GRANDE POR PIEZA', data.articulos.pasteles.grandes, 'SUBTOTAL (Pastel Grande)'));
+  pastelesBody = pastelesBody.concat(buildSectionBody('OTROS', data.articulos.pasteles.otros, 'SUBTOTAL (Otros)'));
+
+  // Build Reposteria Data
+  let reposteriaBody: any[] = [];
+  if (data.articulos.reposteria && data.articulos.reposteria.length > 0) {
+    let repoTotal = 0;
+    data.articulos.reposteria.forEach(i => {
+      repoTotal += i.cantidad;
+      reposteriaBody.push([i.nombre, i.cantidad.toString()]);
+    });
+    reposteriaBody.push([{ content: 'Total Repostería', styles: { fontStyle: 'bold' } }, { content: repoTotal.toString(), styles: { fontStyle: 'bold' } }]);
+  }
+
+  y = drawGroupTable('Burgers / Hamburguesas', burguerBody, y);
   if (y > 250) { doc.addPage(); y = 20; }
-  y = drawGroupTable('Pasteles / Tequeños', data.articulos.pasteles, y);
+  y = drawGroupTable('Pasteles / Tequeños', pastelesBody, y);
   if (y > 250) { doc.addPage(); y = 20; }
-  y = drawGroupTable('Repostería', data.articulos.reposteria, y);
+  y = drawGroupTable('Repostería', reposteriaBody, y);
 
   // 5. Totales de Insumos
   if (data.insumos && (Object.keys(data.insumos.burguer || {}).length > 0 || Object.keys(data.insumos.pasteles || {}).length > 0)) {

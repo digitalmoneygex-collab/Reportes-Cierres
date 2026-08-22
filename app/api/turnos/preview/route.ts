@@ -55,6 +55,22 @@ export async function GET(request: Request) {
 
     const tasa = Number(tasaResult ?? 0);
 
+    // ─── Categorías (espejo de sync-pskloud.js) ───────────────────────────────────
+    const CAT_BURGUER: Record<string, string[]> = {
+      combosHamb:  ["COMBO 10 HAMB CARNE + BEBIDA", "COMBO 14 HAMB CARNE + BEBIDA", "COMBO 7 HAMB CARNE + BEBIDA"],
+      hambSueltas: ["HAMB. DOBLE CARNE", "HAMB. POLLO ESPECIAL", "HAMB. MIXTA", "HAMB. POLLO", "HAMB. PAPICHYS", "HAMB. CARNE"],
+      perros:      ["COMBO 8 PERRO CALIENTE + BEBIDA", "PERRO CALIENTE"],
+      otros:       ["AREPA CABIMERA", "PATACON CARNE MECHADA", "PAPAS FRITAS 150GR"],
+    };
+
+    const CAT_PASTELES: Record<string, string[]> = {
+      pasapalos: ["PASAPALOS 25UND PASTELES", "PASAPALOS 25UND TEQUEÑOS", "PASAPALOS 50UND PASTELES", "PASAPALOS 50UND TEQUEÑOS", "PASAPALOS TEQUE YOYO X50"],
+      pequenos:  ["PASTELES 12 + BEBIDA", "TEQUEÑO 12 + BEBIDAS", "COMBO 6 PASTELES MOLIDA", "COMBO 6 PASTELES PAPAQUESO", "COMBO 6 PASTELES QUESO", "COMBO 6 PASTELES VARIADO", "COMBO 6 TEQUEÑOS"],
+      empanadas: ["EMPANADA MECHADA", "EMPANADA PAPAQUESO", "EMPANADA QUESO"],
+      grandes:   ["PASTEL PAPAQUESO", "PASTEL MOLIDA", "PASTEL MECHADA", "PASTEL PIZZA", "PASTEL QUESO", "TEQUEÑO"],
+      otros:     ["MANDOCAS X UND", "TEQUEYOYOS", "SALSA GRANDE", "SALSA PEQUEÑA"],
+    };
+
     // ─── Factores de Insumos (espejo de sync-pskloud.js / factores.json) ──────
     const FACTORES: Record<string, Record<string, number>> = {
       "AREPA CABIMERA":                    { "Arepa C": 1,  "Carne M": 1,  "Huevo": 1 },
@@ -130,6 +146,17 @@ export async function GET(request: Request) {
       return totales;
     };
 
+    const agruparPorCategoria = (items: ItemCantidad[], catDict: Record<string, string[]>): Record<string, ItemCantidad[]> => {
+      const res: Record<string, ItemCantidad[]> = {};
+      for (const listName in catDict) {
+        res[listName] = catDict[listName].map(expectedName => {
+          const match = items.find(r => normNombre(r.nombre) === normNombre(expectedName));
+          return { nombre: expectedName, cantidad: match ? (Number(match.cantidad) || 0) : 0 };
+        });
+      }
+      return res;
+    };
+
     // Sumar cantidades del período por nombre+categoría
     const sumByKey = new Map<string, ItemCantidad & { categoria: string }>();
     articulos.forEach((a: any) => {
@@ -146,12 +173,12 @@ export async function GET(request: Request) {
     const g02Items     = allItems.filter(a => a.categoria === 'pasteles');
     const g04Items     = allItems.filter(a => a.categoria === 'reposteria');
 
-    const burguerInsumos  = calcularTotales(g03Items);
+    const burguerCats    = agruparPorCategoria(g03Items, CAT_BURGUER);
+    const burguerInsumos = calcularTotales(g03Items);
+
+    const pastelesCats    = agruparPorCategoria(g02Items, CAT_PASTELES);
     const pastelesInsumos = calcularTotales(g02Items);
 
-    // Listas planas para el PDF (solo artículos con cantidad > 0)
-    const burguerFlat  = g03Items.filter(i => i.cantidad > 0).map(i => ({ nombre: i.nombre, cantidad: i.cantidad }));
-    const pastelesFlat = g02Items.filter(i => i.cantidad > 0).map(i => ({ nombre: i.nombre, cantidad: i.cantidad }));
     const reposteriaItems = g04Items.map(i => ({ nombre: i.nombre, cantidad: i.cantidad }));
 
     // Calcular PSKloud Ventas (Ingresos)
@@ -224,17 +251,7 @@ export async function GET(request: Request) {
           totalFacturas: facturas.length
         },
         metodosPago,
-        // Artículos planos (con cantidades reales) para el PDF
-        articulos: {
-          burguer:    burguerFlat,
-          pasteles:   pastelesFlat,
-          reposteria: reposteriaItems,
-        },
-        // Totales de insumos calculados (Pieza G/P/F, Carne H, Pan Burguer, etc.)
-        insumos: {
-          burguer:  burguerInsumos,
-          pasteles: pastelesInsumos,
-        },
+
         pagos: {
           totalBs: totalPagosBs,
           registradosCount: pagosRegistradosCount,
@@ -245,6 +262,26 @@ export async function GET(request: Request) {
           hayPagosSinConciliar: pagosSinProcesarCount > 0,
           hayFacturasSinConciliar: facturasPagoMovilPendientes > 0,
           facturasPendientesCount: facturasPagoMovilPendientes
+        },
+        articulos: {
+          burguer: {
+            combosHamb: burguerCats.combosHamb,
+            hambSueltas: burguerCats.hambSueltas,
+            perros: burguerCats.perros,
+            otros: burguerCats.otros,
+          },
+          pasteles: {
+            pasapalos: pastelesCats.pasapalos,
+            pequenos: pastelesCats.pequenos,
+            empanadas: pastelesCats.empanadas,
+            grandes: pastelesCats.grandes,
+            otros: pastelesCats.otros,
+          },
+          reposteria: reposteriaItems
+        },
+        insumos: {
+          burguer: burguerInsumos,
+          pasteles: pastelesInsumos
         }
       }
     });

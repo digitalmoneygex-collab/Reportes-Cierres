@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { generateShiftReportPdf } from '@/app/lib/pdfGenerator';
 
+type ComboItem = { nombre: string; cantidad: number };
+type RepoItem  = { nombre: string; cantidad: number };
+
 type PreviewData = {
   rango: { start: string; end: string };
   cajero: { nombre: string; cedula: string };
@@ -15,15 +18,94 @@ type PreviewData = {
   pagos: { totalBs: number; registradosCount: number; procesadosCount: number; sinProcesarCount: number };
   alertas: { hayPagosSinConciliar: boolean; hayFacturasSinConciliar: boolean; facturasPendientesCount: number };
   articulos: {
-    burguer: { nombre: string; cantidad: number }[];
-    pasteles: { nombre: string; cantidad: number }[];
-    reposteria: { nombre: string; cantidad: number }[];
+    burguer: {
+      combosHamb: ComboItem[];
+      hambSueltas: ComboItem[];
+      perros: ComboItem[];
+      otros: ComboItem[];
+    };
+    pasteles: {
+      pasapalos: ComboItem[];
+      pequenos: ComboItem[];
+      empanadas: ComboItem[];
+      grandes: ComboItem[];
+      otros: ComboItem[];
+    };
+    reposteria: RepoItem[];
   };
   insumos?: {
     burguer:  Record<string, number>;
     pasteles: Record<string, number>;
   };
 };
+
+// ─── Componentes de UI internos (espejo del Dashboard) ──────────────────────
+function SVal({ v, suffix = '' }: { v: number | null; suffix?: string }) {
+  if (v === null || v === 0 || isNaN(v)) return <span style={{ color: '#2d3748', fontStyle: 'italic', fontSize: '11px' }}>sin ventas</span>;
+  return <span>{v}{suffix}</span>;
+}
+
+function Row({ label, value, color = '#94a3b8', bold = false, isTotal = false }: {
+  label: string; value: React.ReactNode; color?: string; bold?: boolean; isTotal?: boolean;
+}) {
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      padding: isTotal ? '8px 0 4px' : '5px 0',
+      borderTop: isTotal ? '1px solid rgba(148,163,184,0.12)' : undefined,
+      marginTop: isTotal ? '4px' : undefined,
+    }}>
+      <span style={{ fontSize: '11px', color: isTotal ? '#94a3b8' : '#475569', fontWeight: isTotal ? '700' : '400' }}>
+        {label}
+      </span>
+      <span style={{ fontSize: '11px', color, fontWeight: bold || isTotal ? '800' : '600', letterSpacing: '-0.02em' }}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function SectionTitle({ children, icon }: { children: React.ReactNode; icon: string }) {
+  return (
+    <p style={{ fontSize: '10px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+      {icon && <span>{icon}</span>}{children}
+    </p>
+  );
+}
+
+function Divider() {
+  return <div style={{ borderBottom: '1px dashed rgba(148,163,184,0.08)', margin: '8px 0' }} />;
+}
+
+function renderList(title: string, items: ComboItem[], color: string, subtotalLabel: string) {
+  if (!items || items.length === 0) return null;
+  const subtotal = items.reduce((sum, item) => sum + (item.cantidad || 0), 0);
+  
+  return (
+    <>
+      <SectionTitle icon="">{title}</SectionTitle>
+      {items.map((item, i) => {
+        let displayValue = <SVal v={item.cantidad} />;
+        if (item.cantidad > 0) {
+           let match = item.nombre.match(/(\d+)/);
+           let mult = match ? parseInt(match[1]) : 1;
+           if (item.nombre.includes("25UND")) mult = 25;
+           if (item.nombre.includes("50UND") || item.nombre.includes("X50")) mult = 50;
+           if (item.nombre.includes("12")) mult = 12;
+           if (item.nombre.includes("6 PASTELES") || item.nombre.includes("6 TEQUEÑOS")) mult = 6;
+           
+           if (mult > 1 && (item.nombre.includes("COMBO") || item.nombre.includes("PASAPALOS") || item.nombre.includes("12"))) {
+              displayValue = <>{item.cantidad} × {mult} = {item.cantidad * mult}</>;
+           }
+        }
+        return <Row key={i} label={item.nombre} value={displayValue} color={color} />;
+      })}
+      <Row label={subtotalLabel} value={subtotal > 0 ? subtotal : <SVal v={0} />} color={color} isTotal />
+      <Divider />
+    </>
+  );
+}
+
 
 export default function ShiftPreviewModal({ 
   isOpen, 
@@ -196,98 +278,80 @@ export default function ShiftPreviewModal({
               </div>
             </div>
 
-            {/* ─── Sección Piezas Vendidas ───────────────────────────────── */}
+            {/* ─── Sección Piezas Vendidas (Agrupada como en Dashboard) ─── */}
             {(() => {
-              const burguerItems = (data.articulos?.burguer || []).filter(i => i.cantidad > 0);
-              const pastelesItems = (data.articulos?.pasteles || []).filter(i => i.cantidad > 0);
-              const reposteriaItems = (data.articulos?.reposteria || []).filter(i => i.cantidad > 0);
-              const insumosB = (data as any).insumos?.burguer as Record<string, number> | undefined;
-              const insumosP = (data as any).insumos?.pasteles as Record<string, number> | undefined;
+              if (!data.articulos) return null;
+              const { burguer, pasteles, reposteria } = data.articulos;
+              const insumosB = data.insumos?.burguer || {};
+              const insumosP = data.insumos?.pasteles || {};
 
-              // Combinar insumos
-              const todosInsumos: Record<string, number> = {};
-              Object.entries(insumosB || {}).forEach(([k, v]) => { todosInsumos[k] = (todosInsumos[k] || 0) + v; });
-              Object.entries(insumosP || {}).forEach(([k, v]) => { todosInsumos[k] = (todosInsumos[k] || 0) + v; });
-              const INSUMOS_ORDER = ['Pieza G', 'Pieza P', 'Pieza F', 'Carne H', 'Pollo', 'Pan Burguer', 'Pan perro', 'Salchicha', 'Arepa C', 'Carne M', 'Huevo', 'Bebida'];
-              const insumosOrdenados = INSUMOS_ORDER.filter(k => (todosInsumos[k] || 0) > 0).map(k => ({ nombre: k, cantidad: todosInsumos[k] }));
+              const burguerInsumosKeys = ["PAN BURGUER", "PAN PERRO", "SALCHICHA", "CARNE H", "POLLO", "CARNE M", "TAPA P", "AREPA C", "HUEVO", "BEBIDA", "PAPAS FRITAS 150GR"];
+              const pastelesInsumosKeys = ["PIEZA F", "PIEZA P", "PIEZA G", "BEBIDA"];
 
-              const hayPiezas = burguerItems.length > 0 || pastelesItems.length > 0 || reposteriaItems.length > 0;
-
-              if (!hayPiezas && insumosOrdenados.length === 0) return null;
+              const repoTotal = reposteria.reduce((s, i) => s + (i.cantidad || 0), 0);
 
               return (
-                <div style={{ marginBottom: '20px', background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.12)', borderRadius: '10px', padding: '14px' }}>
-                  <h3 style={{ fontSize: '13px', fontWeight: '700', color: '#6ee7b7', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                <div style={{ marginBottom: '20px', background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(148,163,184,0.1)', borderRadius: '10px', padding: '16px' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: '800', color: '#e8edf5', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
                     Piezas Vendidas
                   </h3>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', alignItems: 'start' }}>
 
-                    {/* Burgers */}
-                    <div>
-                      <p style={{ fontSize: '10px', fontWeight: '800', color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>🍔 Burgers</p>
-                      {burguerItems.length === 0 ? (
-                        <p style={{ fontSize: '11px', color: '#334155', fontStyle: 'italic' }}>Sin ventas</p>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                          {burguerItems.map((item, i) => (
-                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                              <span style={{ color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, marginRight: '6px' }}>{item.nombre}</span>
-                              <span style={{ color: '#fbbf24', fontWeight: '700', fontFamily: 'monospace', flexShrink: 0 }}>{item.cantidad}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                    {/* BURGUER COL */}
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(245,158,11,0.1)' }}>
+                      <p style={{ fontSize: '11px', fontWeight: '800', color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        🍔 BURGUER
+                      </p>
+                      
+                      {renderList("COMBOS HAMBURGUESA", burguer.combosHamb, '#fbbf24', 'SUBTOTAL (Hamburguesas de carne en combo)')}
+                      {renderList("HAMBURGUESAS POR UNIDAD", burguer.hambSueltas, '#fbbf24', 'SUBTOTAL (Hamburguesas por unidad)')}
+                      {renderList("PERROS CALIENTES", burguer.perros, '#fbbf24', 'SUBTOTAL (Perro Caliente)')}
+                      {renderList("OTROS", burguer.otros, '#fbbf24', 'SUBTOTAL (Otros)')}
+
+                      <div style={{ background: 'rgba(245,158,11,0.08)', borderRadius: '8px', padding: '10px', border: '1px solid rgba(245,158,11,0.2)', marginTop: '8px' }}>
+                        <p style={{ fontSize: '10px', fontWeight: '800', color: '#fcd34d', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          📊 TOTALES INSUMOS BURGUER
+                        </p>
+                        {burguerInsumosKeys.map(k => (
+                          <Row key={k} label={k} value={insumosB[k] > 0 ? insumosB[k] : <SVal v={0} />} color={insumosB[k] > 0 ? '#fbbf24' : '#94a3b8'} bold />
+                        ))}
+                      </div>
                     </div>
 
-                    {/* Pasteles */}
-                    <div>
-                      <p style={{ fontSize: '10px', fontWeight: '800', color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>🥐 Pasteles / Tequeños</p>
-                      {pastelesItems.length === 0 ? (
-                        <p style={{ fontSize: '11px', color: '#334155', fontStyle: 'italic' }}>Sin ventas</p>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                          {pastelesItems.map((item, i) => (
-                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                              <span style={{ color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, marginRight: '6px' }}>{item.nombre}</span>
-                              <span style={{ color: '#c4b5fd', fontWeight: '700', fontFamily: 'monospace', flexShrink: 0 }}>{item.cantidad}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                    {/* PASTELES COL */}
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.1)' }}>
+                      <p style={{ fontSize: '11px', fontWeight: '800', color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        🥐 PASTELES & PASAPALOS
+                      </p>
+
+                      {renderList("PASAPALOS DE FIESTA", pasteles.pasapalos, '#6ee7b7', 'SUBTOTAL (Pasapalos)')}
+                      {renderList("PASTELES PEQUEÑOS", pasteles.pequenos, '#6ee7b7', 'SUBTOTAL (Pasteles Pequeños)')}
+                      {renderList("EMPANADAS", pasteles.empanadas, '#6ee7b7', 'SUBTOTAL (Empanadas)')}
+                      {renderList("PASTEL GRANDE POR PIEZA", pasteles.grandes, '#6ee7b7', 'SUBTOTAL (Pastel Grande)')}
+                      {renderList("OTROS", pasteles.otros, '#6ee7b7', 'SUBTOTAL (Otros)')}
+
+                      <div style={{ background: 'rgba(16,185,129,0.08)', borderRadius: '8px', padding: '10px', border: '1px solid rgba(16,185,129,0.2)', marginTop: '8px' }}>
+                        <p style={{ fontSize: '10px', fontWeight: '800', color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          📊 TOTALES INSUMOS PASTELES
+                        </p>
+                        {pastelesInsumosKeys.map(k => (
+                          <Row key={k} label={k} value={insumosP[k] > 0 ? insumosP[k] : <SVal v={0} />} color={insumosP[k] > 0 ? '#34d399' : '#94a3b8'} bold />
+                        ))}
+                      </div>
                     </div>
 
-                    {/* Insumos Totales */}
-                    <div style={{ background: 'rgba(16,185,129,0.08)', borderRadius: '8px', padding: '10px' }}>
-                      <p style={{ fontSize: '10px', fontWeight: '800', color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Total Insumos</p>
-                      {insumosOrdenados.length === 0 ? (
-                        <p style={{ fontSize: '11px', color: '#334155', fontStyle: 'italic' }}>Sin datos</p>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                          {insumosOrdenados.map((ins, i) => (
-                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontSize: '11px', color: '#94a3b8' }}>{ins.nombre}</span>
-                              <span style={{
-                                fontSize: '14px', fontWeight: '900', fontFamily: 'monospace',
-                                color: ins.nombre.startsWith('Pieza') ? '#34d399' : ins.nombre.includes('Carne') ? '#f59e0b' : '#818cf8',
-                                background: 'rgba(0,0,0,0.2)', borderRadius: '5px', padding: '1px 8px',
-                              }}>{ins.cantidad}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {reposteriaItems.length > 0 && (
-                        <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(52,211,153,0.15)' }}>
-                          <p style={{ fontSize: '10px', color: '#475569', marginBottom: '4px', fontWeight: '600' }}>Repostería</p>
-                          {reposteriaItems.map((item, i) => (
-                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                              <span style={{ color: '#64748b' }}>{item.nombre}</span>
-                              <span style={{ color: '#94a3b8', fontWeight: '700', fontFamily: 'monospace' }}>{item.cantidad}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                    {/* REPOSTERIA COL */}
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(167,139,250,0.1)' }}>
+                      <p style={{ fontSize: '11px', fontWeight: '800', color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        🍰 REPOSTERIA
+                      </p>
+                      
+                      {reposteria.map((item, i) => (
+                        <Row key={i} label={item.nombre} value={<SVal v={item.cantidad} />} color="#c4b5fd" />
+                      ))}
+                      <Row label="🎂 Total" value={repoTotal > 0 ? repoTotal : <SVal v={0} />} color="#c4b5fd" isTotal />
                     </div>
 
                   </div>
