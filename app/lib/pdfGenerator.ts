@@ -24,6 +24,11 @@ export type ShiftPdfData = {
     pasteles: { nombre: string; cantidad: number }[];
     reposteria: { nombre: string; cantidad: number }[];
   };
+  // Totales de insumos calculados con FACTORES
+  insumos?: {
+    burguer:  Record<string, number>;
+    pasteles: Record<string, number>;
+  };
 };
 
 const METODOS_LABELS: Record<string, string> = {
@@ -176,6 +181,40 @@ export function generateShiftReportPdf(data: ShiftPdfData) {
   y = drawGroupTable('Pasteles / Tequeños', data.articulos.pasteles, y);
   if (y > 250) { doc.addPage(); y = 20; }
   y = drawGroupTable('Repostería', data.articulos.reposteria, y);
+
+  // 5. Totales de Insumos
+  if (data.insumos && (Object.keys(data.insumos.burguer || {}).length > 0 || Object.keys(data.insumos.pasteles || {}).length > 0)) {
+    if (y > 200) { doc.addPage(); y = 20; }
+    y += 8;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('5. TOTAL DE PIEZAS / INSUMOS', 15, y);
+    y += 6;
+
+    // Combinar insumos de burguer y pasteles
+    const todosInsumos: Record<string, number> = {};
+    Object.entries(data.insumos.burguer || {}).forEach(([k, v]) => { todosInsumos[k] = (todosInsumos[k] || 0) + v; });
+    Object.entries(data.insumos.pasteles || {}).forEach(([k, v]) => { todosInsumos[k] = (todosInsumos[k] || 0) + v; });
+
+    const INSUMOS_ORDER = ['Pieza G', 'Pieza P', 'Pieza F', 'Carne H', 'Pollo', 'Pan Burguer', 'Pan perro', 'Salchicha', 'Arepa C', 'Carne M', 'Huevo', 'Bebida'];
+    const insumosBody = INSUMOS_ORDER
+      .filter(k => (todosInsumos[k] || 0) > 0)
+      .map(k => [k, todosInsumos[k].toString()]);
+    
+    if (insumosBody.length > 0) {
+      autoTable(doc, {
+        startY: y,
+        head: [['Insumo / Pieza', 'Total']],
+        body: insumosBody,
+        theme: 'grid',
+        styles: { fontSize: 10, cellPadding: 2 },
+        headStyles: { fillColor: [16, 185, 129] },
+        margin: { left: 15, right: 100 }
+      });
+      // @ts-ignore
+      y = doc.lastAutoTable.finalY + 8;
+    }
+  }
 
   // Firmas
   if (y > 210) { doc.addPage(); y = 20; }

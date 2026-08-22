@@ -41,10 +41,13 @@ export default function ShiftPreviewModal({
   const [data, setData] = useState<PreviewData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // 3-step flow: preview → confirming → closing
+  const [step, setStep] = useState<'preview' | 'confirming' | 'closing'>('preview');
 
   useEffect(() => {
     if (!isOpen) {
       setData(null);
+      setStep('preview');
       return;
     }
     const load = async () => {
@@ -229,39 +232,82 @@ export default function ShiftPreviewModal({
               )}
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-              <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-              {canClose && (
-                <button 
-                  className="btn" 
-                  style={{ background: '#ef4444', color: 'white', border: 'none' }}
-                  onClick={async () => {
-                    // Generar PDF y Descargar
-                    if (data) {
-                      try {
-                        generateShiftReportPdf({
-                          fecha: new Date(data.rango.start).toLocaleDateString('es-VE'),
-                          horaApertura: new Date(data.rango.start).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }),
-                          horaCierre: data.rango.end ? new Date(data.rango.end).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }),
-                          cajeroNombre: data.cajero?.nombre || 'CAJERO DESCONOCIDO',
-                          cajeroCedula: data.cajero?.cedula || 'V-00000000',
-                          supervisorNombre: supervisorName,
-                          pskloud: data.pskloud,
-                          metodosPago: data.metodosPago || [],
-                          pagos: data.pagos || { totalBs: 0, registradosCount: 0, procesadosCount: 0 },
-                          articulos: data.articulos || { burguer: [], pasteles: [], reposteria: [] }
-                        });
-                      } catch (err) {
-                        console.error('Error generando PDF:', err);
-                        alert('Hubo un error generando el PDF, pero el turno se cerrará de todos modos.');
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', flexWrap: 'wrap' }}>
+              {step === 'preview' && (
+                <>
+                  <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+                  {canClose && (
+                    <button
+                      className="btn"
+                      style={{ background: '#ef4444', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}
+                      onClick={() => setStep('confirming')}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                      Continuar al cierre
+                    </button>
+                  )}
+                </>
+              )}
+
+              {step === 'confirming' && (
+                <>
+                  {/* Paso de confirmación final */}
+                  <div style={{ width: '100%', padding: '16px', borderRadius: '10px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px' }}>
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                      </svg>
+                      <div>
+                        <p style={{ fontSize: '14px', fontWeight: '800', color: '#fca5a5', marginBottom: '4px' }}>¿Confirmar cierre del turno?</p>
+                        <p style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
+                          Esta acción <strong style={{ color: '#fca5a5' }}>no se puede deshacer</strong>. Se generará el PDF del cierre y el turno quedará cerrado en el sistema.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <button className="btn btn-ghost" onClick={() => setStep('preview')} style={{ flexShrink: 0 }}>Volver</button>
+                  <button
+                    className="btn"
+                    style={{ background: '#ef4444', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}
+                    onClick={async () => {
+                      setStep('closing');
+                      // Generar PDF primero
+                      if (data) {
+                        try {
+                          generateShiftReportPdf({
+                            fecha: new Date(data.rango.start).toLocaleDateString('es-VE'),
+                            horaApertura: new Date(data.rango.start).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }),
+                            horaCierre: data.rango.end ? new Date(data.rango.end).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }),
+                            cajeroNombre: data.cajero?.nombre || 'CAJERO DESCONOCIDO',
+                            cajeroCedula: data.cajero?.cedula || 'V-00000000',
+                            supervisorNombre: supervisorName,
+                            pskloud: data.pskloud,
+                            metodosPago: data.metodosPago || [],
+                            pagos: data.pagos || { totalBs: 0, registradosCount: 0, procesadosCount: 0 },
+                            articulos: data.articulos || { burguer: [], pasteles: [], reposteria: [] },
+                            insumos: (data as any).insumos || undefined,
+                          });
+                        } catch (err) {
+                          console.error('Error generando PDF:', err);
+                        }
                       }
-                    }
-                    await onConfirm();
-                    onClose();
-                  }}
-                >
-                  Confirmar y Cerrar
-                </button>
+                      await onConfirm();
+                      onClose();
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    Sí, cerrar turno
+                  </button>
+                </>
+              )}
+
+              {step === 'closing' && (
+                <div style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', padding: '12px 0', color: '#94a3b8' }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}>
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                  </svg>
+                  <span style={{ fontSize: '14px', fontWeight: '600' }}>Cerrando turno y generando PDF...</span>
+                </div>
               )}
             </div>
           </div>

@@ -62,10 +62,14 @@ export default function DashboardPage() {
       const json = await res.json();
       if (json.ok) {
         setTurno(null);
-        alert('Turno cerrado correctamente');
+        setPskloudData(null);
+        setPagos([]);
+        setNewCount(0);
+      } else {
+        alert('Error cerrando turno: ' + (json.error || 'desconocido'));
       }
     } catch (e) {
-      alert('Error cerrando turno');
+      alert('Error de red al cerrar turno');
     }
   };
 

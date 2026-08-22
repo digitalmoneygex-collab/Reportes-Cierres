@@ -55,20 +55,104 @@ export async function GET(request: Request) {
 
     const tasa = Number(tasaResult ?? 0);
 
-    // Agrupar Articulos
-    const agruparArticulos = (cat: string) => {
-      const filtrados = articulos.filter(a => a.categoria === cat);
-      const map = new Map<string, number>();
-      filtrados.forEach(a => {
-        map.set(a.nombre, (map.get(a.nombre) || 0) + Number(a.cantidad));
-      });
-      return Array.from(map.entries()).map(([nombre, cantidad]) => ({ nombre, cantidad }));
+    // ─── Factores de Insumos (espejo de sync-pskloud.js / factores.json) ──────
+    const FACTORES: Record<string, Record<string, number>> = {
+      "AREPA CABIMERA":                    { "Arepa C": 1,  "Carne M": 1,  "Huevo": 1 },
+      "COMBO 10 HAMB CARNE + BEBIDA":      { "Carne H": 10, "Pan Burguer": 10, "Bebida": 1 },
+      "COMBO 14 HAMB CARNE + BEBIDA":      { "Carne H": 14, "Pan Burguer": 14, "Bebida": 1 },
+      "COMBO 7 HAMB CARNE + BEBIDA":       { "Carne H": 7,  "Pan Burguer": 7,  "Bebida": 1 },
+      "HAMB. DOBLE CARNE":                 { "Carne H": 2,  "Pan Burguer": 1 },
+      "HAMB. POLLO ESPECIAL":              { "Carne H": 2,  "Pan Burguer": 1 },
+      "HAMB. MIXTA":                       { "Carne H": 1,  "Pollo": 1,    "Pan Burguer": 1 },
+      "HAMB. POLLO":                       { "Carne H": 1,  "Pan Burguer": 1 },
+      "HAMB. PAPICHYS":                    { "Carne H": 1,  "Pollo": 2,    "Pan Burguer": 1 },
+      "HAMB. CARNE":                       { "Carne H": 1,  "Pan Burguer": 1 },
+      "COMBO 8 PERRO CALIENTE + BEBIDA":   { "Pan perro": 8, "Salchicha": 8, "Bebida": 1 },
+      "PERRO CALIENTE":                    { "Pan perro": 1, "Salchicha": 1 },
+      "PAPAS FRITAS 150GR":                {},
+      "PASAPALOS 25UND PASTELES":          { "Pieza F": 25 },
+      "PASAPALOS 25UND TEQUEÑOS":          { "Pieza F": 25 },
+      "PASAPALOS 50UND PASTELES":          { "Pieza F": 50 },
+      "PASAPALOS 50UND TEQUEÑOS":          { "Pieza F": 50 },
+      "PASTELES 12 + BEBIDA":              { "Pieza P": 12, "Bebida": 1 },
+      "TEQUEÑO 12 + BEBIDAS":              { "Pieza P": 12, "Bebida": 1 },
+      "COMBO 6 PASTELES MOLIDA":           { "Pieza P": 6 },
+      "COMBO 6 PASTELES PAPAQUESO":        { "Pieza P": 6 },
+      "COMBO 6 PASTELES QUESO":            { "Pieza P": 6 },
+      "COMBO 6 PASTELES VARIADO":          { "Pieza P": 6 },
+      "COMBO 6 TEQUEÑOS":                  { "Pieza P": 6 },
+      "TEQUEÑO":                           { "Pieza G": 1 },
+      "EMPANADA MECHADA":                  { "Pieza G": 1 },
+      "EMPANADA PAPAQUESO":                { "Pieza G": 1 },
+      "EMPANADA QUESO":                    { "Pieza G": 1 },
+      "MANDOCAS X UND":                    { "Pieza G": 1 },
+      "PASAPALOS TEQUE YOYO X50":          { "Pieza F": 50 },
+      "TEQUEYOYOS":                        { "Pieza G": 1 },
+      "PASTEL PAPAQUESO":                  { "Pieza G": 1 },
+      "PASTEL MOLIDA":                     { "Pieza G": 1 },
+      "PASTEL MECHADA":                    { "Pieza G": 1 },
+      "PASTEL PIZZA":                      { "Pieza G": 1 },
+      "PASTEL QUESO":                      { "Pieza G": 1 },
+      "SALSA GRANDE":                      {},
+      "SALSA PEQUEÑA":                     {},
+      "NESCAFE+MILHOJA":                   {},
+      "BRAZO GITANO":                      {},
+      "BOMBA":                             {},
+      "MILHOJAS RELLENA":                  {},
     };
 
-    const burguer = agruparArticulos('burguer');
-    const pasteles = agruparArticulos('pasteles');
-    const reposteria = agruparArticulos('reposteria');
-    const articulosAgrupados = { burguer, pasteles, reposteria };
+    type ItemCantidad = { nombre: string; cantidad: number };
+
+    const normNombre = (s: string): string => {
+      let n = String(s ?? '').trim().toUpperCase();
+      n = n.replace(/TEQUE.O/g, 'TEQUEÑO');
+      n = n.replace(/PEQUE.A/g, 'PEQUEÑA');
+      return n;
+    };
+
+    /** Suma insumos según FACTORES — réplica exacta de sync-pskloud.js */
+    const calcularTotales = (items: ItemCantidad[]): Record<string, number> => {
+      const totales: Record<string, number> = {};
+      items.forEach(item => {
+        const nombreNorm = normNombre(item.nombre);
+        const qty = Number(item.cantidad) || 0;
+        let itemFactores: Record<string, number> | null = null;
+        for (const key in FACTORES) {
+          if (normNombre(key) === nombreNorm) { itemFactores = FACTORES[key]; break; }
+        }
+        if (itemFactores) {
+          for (const insumo in itemFactores) {
+            if (!totales[insumo]) totales[insumo] = 0;
+            totales[insumo] += itemFactores[insumo] * qty;
+          }
+        }
+      });
+      return totales;
+    };
+
+    // Sumar cantidades del período por nombre+categoría
+    const sumByKey = new Map<string, ItemCantidad & { categoria: string }>();
+    articulos.forEach((a: any) => {
+      const key = `${a.categoria}||${normNombre(a.nombre)}`;
+      if (sumByKey.has(key)) {
+        sumByKey.get(key)!.cantidad += Number(a.cantidad) || 0;
+      } else {
+        sumByKey.set(key, { nombre: normNombre(a.nombre), cantidad: Number(a.cantidad) || 0, categoria: a.categoria });
+      }
+    });
+
+    const allItems     = Array.from(sumByKey.values());
+    const g03Items     = allItems.filter(a => a.categoria === 'burguer');
+    const g02Items     = allItems.filter(a => a.categoria === 'pasteles');
+    const g04Items     = allItems.filter(a => a.categoria === 'reposteria');
+
+    const burguerInsumos  = calcularTotales(g03Items);
+    const pastelesInsumos = calcularTotales(g02Items);
+
+    // Listas planas para el PDF (solo artículos con cantidad > 0)
+    const burguerFlat  = g03Items.filter(i => i.cantidad > 0).map(i => ({ nombre: i.nombre, cantidad: i.cantidad }));
+    const pastelesFlat = g02Items.filter(i => i.cantidad > 0).map(i => ({ nombre: i.nombre, cantidad: i.cantidad }));
+    const reposteriaItems = g04Items.map(i => ({ nombre: i.nombre, cantidad: i.cantidad }));
 
     // Calcular PSKloud Ventas (Ingresos)
     let totalBs = 0;
@@ -140,7 +224,17 @@ export async function GET(request: Request) {
           totalFacturas: facturas.length
         },
         metodosPago,
-        articulos: articulosAgrupados,
+        // Artículos planos (con cantidades reales) para el PDF
+        articulos: {
+          burguer:    burguerFlat,
+          pasteles:   pastelesFlat,
+          reposteria: reposteriaItems,
+        },
+        // Totales de insumos calculados (Pieza G/P/F, Carne H, Pan Burguer, etc.)
+        insumos: {
+          burguer:  burguerInsumos,
+          pasteles: pastelesInsumos,
+        },
         pagos: {
           totalBs: totalPagosBs,
           registradosCount: pagosRegistradosCount,

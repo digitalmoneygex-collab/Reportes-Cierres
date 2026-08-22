@@ -2,6 +2,127 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getTasaDelDia } from '@/lib/tasa';
 
+// ─── Factores de Insumos (espejo de sync-pskloud.js / factores.json) ──────────
+// Cada artículo tiene sus insumos y cuántos usa por unidad vendida.
+const FACTORES: Record<string, Record<string, number>> = {
+  "AREPA CABIMERA":                    { "Arepa C": 1,  "Carne M": 1,  "Huevo": 1 },
+  "COMBO 10 HAMB CARNE + BEBIDA":      { "Carne H": 10, "Pan Burguer": 10, "Bebida": 1 },
+  "COMBO 14 HAMB CARNE + BEBIDA":      { "Carne H": 14, "Pan Burguer": 14, "Bebida": 1 },
+  "COMBO 7 HAMB CARNE + BEBIDA":       { "Carne H": 7,  "Pan Burguer": 7,  "Bebida": 1 },
+  "HAMB. DOBLE CARNE":                 { "Carne H": 2,  "Pan Burguer": 1 },
+  "HAMB. POLLO ESPECIAL":              { "Carne H": 2,  "Pan Burguer": 1 },
+  "HAMB. MIXTA":                       { "Carne H": 1,  "Pollo": 1,    "Pan Burguer": 1 },
+  "HAMB. POLLO":                       { "Carne H": 1,  "Pan Burguer": 1 },
+  "HAMB. PAPICHYS":                    { "Carne H": 1,  "Pollo": 2,    "Pan Burguer": 1 },
+  "HAMB. CARNE":                       { "Carne H": 1,  "Pan Burguer": 1 },
+  "COMBO 8 PERRO CALIENTE + BEBIDA":   { "Pan perro": 8, "Salchicha": 8, "Bebida": 1 },
+  "PERRO CALIENTE":                    { "Pan perro": 1, "Salchicha": 1 },
+  "PAPAS FRITAS 150GR":                {},
+  "PASAPALOS 25UND PASTELES":          { "Pieza F": 25 },
+  "PASAPALOS 25UND TEQUEÑOS":          { "Pieza F": 25 },
+  "PASAPALOS 50UND PASTELES":          { "Pieza F": 50 },
+  "PASAPALOS 50UND TEQUEÑOS":          { "Pieza F": 50 },
+  "PASTELES 12 + BEBIDA":              { "Pieza P": 12, "Bebida": 1 },
+  "TEQUEÑO 12 + BEBIDAS":              { "Pieza P": 12, "Bebida": 1 },
+  "COMBO 6 PASTELES MOLIDA":           { "Pieza P": 6 },
+  "COMBO 6 PASTELES PAPAQUESO":        { "Pieza P": 6 },
+  "COMBO 6 PASTELES QUESO":            { "Pieza P": 6 },
+  "COMBO 6 PASTELES VARIADO":          { "Pieza P": 6 },
+  "COMBO 6 TEQUEÑOS":                  { "Pieza P": 6 },
+  "TEQUEÑO":                           { "Pieza G": 1 },
+  "EMPANADA MECHADA":                  { "Pieza G": 1 },
+  "EMPANADA PAPAQUESO":                { "Pieza G": 1 },
+  "EMPANADA QUESO":                    { "Pieza G": 1 },
+  "MANDOCAS X UND":                    { "Pieza G": 1 },
+  "PASAPALOS TEQUE YOYO X50":          { "Pieza F": 50 },
+  "TEQUEYOYOS":                        { "Pieza G": 1 },
+  "PASTEL PAPAQUESO":                  { "Pieza G": 1 },
+  "PASTEL MOLIDA":                     { "Pieza G": 1 },
+  "PASTEL MECHADA":                    { "Pieza G": 1 },
+  "PASTEL PIZZA":                      { "Pieza G": 1 },
+  "PASTEL QUESO":                      { "Pieza G": 1 },
+  "SALSA GRANDE":                      {},
+  "SALSA PEQUEÑA":                     {},
+  "NESCAFE+MILHOJA":                   {},
+  "BRAZO GITANO":                      {},
+  "BOMBA":                             {},
+  "MILHOJAS RELLENA":                  {},
+};
+
+// ─── Categorías (espejo de sync-pskloud.js) ───────────────────────────────────
+const CAT_BURGUER: Record<string, string[]> = {
+  combosHamb:  ["COMBO 10 HAMB CARNE + BEBIDA", "COMBO 14 HAMB CARNE + BEBIDA", "COMBO 7 HAMB CARNE + BEBIDA"],
+  hambSueltas: ["HAMB. DOBLE CARNE", "HAMB. POLLO ESPECIAL", "HAMB. MIXTA", "HAMB. POLLO", "HAMB. PAPICHYS", "HAMB. CARNE"],
+  perros:      ["COMBO 8 PERRO CALIENTE + BEBIDA", "PERRO CALIENTE"],
+  otros:       ["AREPA CABIMERA", "PATACON CARNE MECHADA", "PAPAS FRITAS 150GR"],
+};
+
+const CAT_PASTELES: Record<string, string[]> = {
+  pasapalos: ["PASAPALOS 25UND PASTELES", "PASAPALOS 25UND TEQUEÑOS", "PASAPALOS 50UND PASTELES", "PASAPALOS 50UND TEQUEÑOS", "PASAPALOS TEQUE YOYO X50"],
+  pequenos:  ["PASTELES 12 + BEBIDA", "TEQUEÑO 12 + BEBIDAS", "COMBO 6 PASTELES MOLIDA", "COMBO 6 PASTELES PAPAQUESO", "COMBO 6 PASTELES QUESO", "COMBO 6 PASTELES VARIADO", "COMBO 6 TEQUEÑOS"],
+  empanadas: ["EMPANADA MECHADA", "EMPANADA PAPAQUESO", "EMPANADA QUESO"],
+  grandes:   ["PASTEL PAPAQUESO", "PASTEL MOLIDA", "PASTEL MECHADA", "PASTEL PIZZA", "PASTEL QUESO", "TEQUEÑO"],
+  otros:     ["MANDOCAS X UND", "TEQUEYOYOS", "SALSA GRANDE", "SALSA PEQUEÑA"],
+};
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function normalizarNombre(nombre: string): string {
+  let nom = String(nombre ?? '').trim().toUpperCase();
+  nom = nom.replace(/TEQUE.O/g, 'TEQUEÑO');
+  nom = nom.replace(/PEQUE.A/g, 'PEQUEÑA');
+  return nom;
+}
+
+type ItemCantidad = { nombre: string; cantidad: number };
+
+/**
+ * Dado un array de { nombre, cantidad }, suma los insumos según FACTORES.
+ * Replica exactamente la función calcularTotales() de sync-pskloud.js.
+ */
+function calcularTotales(items: ItemCantidad[]): Record<string, number> {
+  const totales: Record<string, number> = {};
+  items.forEach(item => {
+    const nombreNorm = normalizarNombre(item.nombre);
+    const qty = Number(item.cantidad) || 0;
+    let itemFactores: Record<string, number> | null = null;
+    for (const key in FACTORES) {
+      if (normalizarNombre(key) === nombreNorm) {
+        itemFactores = FACTORES[key];
+        break;
+      }
+    }
+    if (itemFactores) {
+      for (const insumo in itemFactores) {
+        if (!totales[insumo]) totales[insumo] = 0;
+        totales[insumo] += itemFactores[insumo] * qty;
+      }
+    }
+  });
+  return totales;
+}
+
+/**
+ * Clasifica un array plano de { nombre, cantidad } en las categorías definidas.
+ * Para cada nombre esperado en la categoría, busca en el array y pone 0 si no está.
+ */
+function agruparPorCategoria(
+  items: ItemCantidad[],
+  catDict: Record<string, string[]>
+): Record<string, ItemCantidad[]> {
+  const res: Record<string, ItemCantidad[]> = {};
+  for (const listName in catDict) {
+    res[listName] = catDict[listName].map(expectedName => {
+      const match = items.find(r => normalizarNombre(r.nombre) === normalizarNombre(expectedName));
+      return {
+        nombre:   expectedName,
+        cantidad: match ? (Number(match.cantidad) || 0) : 0,
+      };
+    });
+  }
+  return res;
+}
+
+// ─── Route Handler ────────────────────────────────────────────────────────────
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -70,7 +191,7 @@ export async function GET(request: Request) {
     const facturas = facturasResult.data || [];
     const articulos = articulosResult.data || [];
 
-    // Calcular Totales
+    // ── Calcular Totales de Caja ──────────────────────────────────────────────
     let totalBs = 0;
     let devolucionesEfBs = 0;
 
@@ -90,7 +211,7 @@ export async function GET(request: Request) {
     const devolucionesEfUsd = tasa > 0 ? devolucionesEfBs / tasa : 0;
     const totalRecibidoUsd = tasa > 0 ? totalRecibidoBs / tasa : 0;
 
-    // Métodos de Pago Conciliados
+    // ── Métodos de Pago Conciliados ───────────────────────────────────────────
     const metodosPago = facturas.filter(f => f.procesado).reduce((acc: any, curr) => {
       if (!curr.metodo_pago) return acc;
       let metodoPagoReal = curr.metodo_pago;
@@ -114,17 +235,36 @@ export async function GET(request: Request) {
       return acc;
     }, []);
 
-    // Agrupar Articulos
-    const agruparArticulos = (cat: string) => {
-      const filtrados = articulos.filter(a => a.categoria === cat);
-      const map = new Map<string, number>();
-      filtrados.forEach(a => {
-        map.set(a.nombre, (map.get(a.nombre) || 0) + Number(a.cantidad));
-      });
-      return Array.from(map.entries()).map(([nombre, cantidad]) => ({ nombre, cantidad }));
-    };
+    // ── Agrupar artículos por categoría sumando cantidades del período ────────
+    const sumByKey = new Map<string, ItemCantidad & { categoria: string }>();
+    articulos.forEach((a: any) => {
+      const key = `${a.categoria}||${normalizarNombre(a.nombre)}`;
+      if (sumByKey.has(key)) {
+        sumByKey.get(key)!.cantidad += Number(a.cantidad) || 0;
+      } else {
+        sumByKey.set(key, {
+          nombre:    normalizarNombre(a.nombre),
+          cantidad:  Number(a.cantidad) || 0,
+          categoria: a.categoria,
+        });
+      }
+    });
 
-    const reposteriaItems = agruparArticulos('reposteria');
+    const allItems    = Array.from(sumByKey.values());
+    const g03Items    = allItems.filter(a => a.categoria === 'burguer');
+    const g02Items    = allItems.filter(a => a.categoria === 'pasteles');
+    const g04Items    = allItems.filter(a => a.categoria === 'reposteria');
+
+    // ── Burguer: clasificar + calcular insumos ────────────────────────────────
+    const burguerCats    = agruparPorCategoria(g03Items, CAT_BURGUER);
+    const burguerInsumos = calcularTotales(g03Items);
+
+    // ── Pasteles: clasificar + calcular insumos ───────────────────────────────
+    const pastelesCats    = agruparPorCategoria(g02Items, CAT_PASTELES);
+    const pastelesInsumos = calcularTotales(g02Items);
+
+    // ── Repostería ────────────────────────────────────────────────────────────
+    const reposteriaItems = g04Items.map(i => ({ nombre: i.nombre, cantidad: i.cantidad }));
     const reposteriaTotal = reposteriaItems.reduce((acc, i) => acc + i.cantidad, 0);
 
     return NextResponse.json({
@@ -143,24 +283,24 @@ export async function GET(request: Request) {
       },
       metodosPago,
       burguer: {
-        combosHamb: [], // En esta iteración simplificada mandamos los items raw al PskloudPanel
-        hambSueltas: agruparArticulos('burguer'),
-        perros: [],
-        otros: [],
-        totalesInsumos: {}
+        combosHamb:     burguerCats.combosHamb   || [],
+        hambSueltas:    burguerCats.hambSueltas  || [],
+        perros:         burguerCats.perros       || [],
+        otros:          burguerCats.otros        || [],
+        totalesInsumos: burguerInsumos,
       },
       pasteles: {
-        pasapalos: [],
-        pequenos: agruparArticulos('pasteles'),
-        empanadas: [],
-        grandes: [],
-        otros: [],
-        totalesInsumos: {}
+        pasapalos:      pastelesCats.pasapalos   || [],
+        pequenos:       pastelesCats.pequenos    || [],
+        empanadas:      pastelesCats.empanadas   || [],
+        grandes:        pastelesCats.grandes     || [],
+        otros:          pastelesCats.otros       || [],
+        totalesInsumos: pastelesInsumos,
       },
       reposteria: {
         items: reposteriaItems,
-        total: reposteriaTotal
-      }
+        total: reposteriaTotal,
+      },
     });
 
   } catch (err: unknown) {
