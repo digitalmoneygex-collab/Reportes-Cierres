@@ -35,6 +35,7 @@ export default function PagosPage() {
   const [filterDate, setDate]   = useState(new Date().toISOString().split('T')[0]);
   const [filterBanco, setBanco] = useState('Todos');
   const [search, setSearch]     = useState('');
+  const [checkedRows, setCheckedRows] = useState<Set<string>>(new Set());
 
   const loadTasa = useCallback(async () => {
     try {
@@ -165,6 +166,7 @@ export default function PagosPage() {
             <table>
               <thead>
                 <tr>
+                  <th style={{ width: '40px' }}></th>
                   <th>Fecha / Hora</th>
                   <th>Banco</th>
                   <th>Referencia</th>
@@ -177,7 +179,7 @@ export default function PagosPage() {
               <tbody>
                 {pagos.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '56px', color: '#475569' }}>
+                    <td colSpan={8} style={{ textAlign: 'center', padding: '56px', color: '#475569' }}>
                       <div style={{ fontSize: '32px', marginBottom: '10px' }}>🔍</div>
                       Sin registros para los filtros seleccionados
                     </td>
@@ -186,7 +188,20 @@ export default function PagosPage() {
                   pagos.map(p => {
                     const { date, time } = fmtDT(p.created_at);
                     return (
-                      <tr key={p.id}>
+                      <tr key={p.id} style={{ background: checkedRows.has(p.id) ? 'rgba(52,211,153,0.05)' : 'transparent', transition: 'background 0.2s' }}>
+                        <td style={{ textAlign: 'center' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={checkedRows.has(p.id)}
+                            onChange={(e) => {
+                              const newSet = new Set(checkedRows);
+                              if (e.target.checked) newSet.add(p.id);
+                              else newSet.delete(p.id);
+                              setCheckedRows(newSet);
+                            }}
+                            style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#34d399' }}
+                          />
+                        </td>
                         <td>
                           <div style={{ fontSize: '13px', fontWeight: '500' }}>{date}</div>
                           <div style={{ fontSize: '11px', color: '#475569', fontFamily: 'monospace' }}>{time}</div>
