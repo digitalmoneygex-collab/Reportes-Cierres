@@ -314,9 +314,11 @@ export default function ShiftPreviewModal({
                         <p style={{ fontSize: '10px', fontWeight: '800', color: '#fcd34d', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                           📊 TOTALES INSUMOS BURGUER
                         </p>
-                        {burguerInsumosKeys.map(k => (
-                          <Row key={k} label={k} value={insumosB[k] > 0 ? insumosB[k] : <SVal v={0} />} color={insumosB[k] > 0 ? '#fbbf24' : '#94a3b8'} bold />
-                        ))}
+                        {burguerInsumosKeys.map(k => {
+                          const matchKey = Object.keys(insumosB).find(tk => tk.toUpperCase() === k);
+                          const val = matchKey ? insumosB[matchKey] : 0;
+                          return <Row key={k} label={k} value={val > 0 ? val : <SVal v={0} />} color={val > 0 ? '#fbbf24' : '#94a3b8'} bold={val > 0} />;
+                        })}
                       </div>
                     </div>
 
@@ -336,9 +338,11 @@ export default function ShiftPreviewModal({
                         <p style={{ fontSize: '10px', fontWeight: '800', color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                           📊 TOTALES INSUMOS PASTELES
                         </p>
-                        {pastelesInsumosKeys.map(k => (
-                          <Row key={k} label={k} value={insumosP[k] > 0 ? insumosP[k] : <SVal v={0} />} color={insumosP[k] > 0 ? '#34d399' : '#94a3b8'} bold />
-                        ))}
+                        {pastelesInsumosKeys.map(k => {
+                          const matchKey = Object.keys(insumosP).find(tk => tk.toUpperCase() === k);
+                          const val = matchKey ? insumosP[matchKey] : 0;
+                          return <Row key={k} label={k} value={val > 0 ? val : <SVal v={0} />} color={val > 0 ? '#34d399' : '#94a3b8'} bold={val > 0} />;
+                        })}
                       </div>
                     </div>
 
