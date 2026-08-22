@@ -203,6 +203,28 @@ export default function ConciliacionPage() {
 
   const resetFilters = () => { setFMetodo('todos'); setFEstado('todos'); setFTipo('todos'); setFSearch(''); };
 
+  // ── Conteos facetados (calculados sobre TODOS los datos, sin filtros) ────────
+  const facets = {
+    // Tipo / prefijo
+    fac:           facturas.filter(f => f.tipo_doc === 'FAC').length,
+    dev:           facturas.filter(f => f.tipo_doc === 'DEV').length,
+    con_asterisco: facturas.filter(f => f.documento.startsWith('*')).length,
+    sin_asterisco: facturas.filter(f => !f.documento.startsWith('*')).length,
+    // Estado
+    todos_estado:  facturas.length,
+    pendiente:     facturas.filter(f => !f.procesado).length,
+    procesada:     facturas.filter(f => f.procesado).length,
+    // Métodos de pago: conteo por valor real asignado
+    metodos: METODOS_PAGO.reduce((acc, m) => {
+      acc[m.value] = facturas.filter(f => {
+        const v = selects[f.id] ?? f.metodo_pago ?? '';
+        return v === m.value;
+      }).length;
+      return acc;
+    }, {} as Record<string, number>),
+    sin_asignar: facturas.filter(f => !(selects[f.id] ?? f.metodo_pago ?? '')).length,
+  };
+
   return (
     <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
 
@@ -294,11 +316,11 @@ export default function ConciliacionPage() {
               onChange={e => setFTipo(e.target.value)}
               style={{ width: '100%', background: 'rgba(15,23,42,0.9)', border: `1px solid ${fTipo !== 'todos' ? 'rgba(99,102,241,0.5)' : 'rgba(148,163,184,0.12)'}`, borderRadius: '8px', padding: '7px 10px', color: fTipo !== 'todos' ? '#e8edf5' : '#475569', fontSize: '12px', outline: 'none', cursor: 'pointer' }}
             >
-              <option value="todos">— Todos —</option>
-              <option value="fac">🧾 Solo Facturas (FAC)</option>
-              <option value="dev">↩️ Solo Devoluciones (DEV)</option>
-              <option value="con_asterisco">⭐ Con prefijo * (ej: *0002420)</option>
-              <option value="sin_asterisco">📄 Sin prefijo (ej: 0000113)</option>
+              <option value="todos">— Todos — ({facturas.length})</option>
+              <option value="fac">🧾 Solo Facturas (FAC) · {facets.fac}</option>
+              <option value="dev">↩️ Solo Devoluciones (DEV) · {facets.dev}</option>
+              <option value="con_asterisco">⭐ Con prefijo * · {facets.con_asterisco}</option>
+              <option value="sin_asterisco">📄 Sin prefijo · {facets.sin_asterisco}</option>
             </select>
           </div>
 
@@ -306,17 +328,25 @@ export default function ConciliacionPage() {
           <div>
             <p style={{ fontSize: '10px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Estado</p>
             <div style={{ display: 'flex', gap: '6px' }}>
-              {[['todos', '⚪ Todos'], ['pendiente', '⏳ Pendientes'], ['procesada', '✅ Procesadas']].map(([v, l]) => (
+              {([
+                { v: 'todos',    l: 'Todos',      count: facets.todos_estado, activeColor: '#818cf8',  activeBg: 'rgba(99,102,241,0.2)',   activeBorder: 'rgba(99,102,241,0.4)' },
+                { v: 'pendiente',l: 'Pendientes', count: facets.pendiente,    activeColor: '#fbbf24',  activeBg: 'rgba(251,191,36,0.2)',   activeBorder: 'rgba(251,191,36,0.5)' },
+                { v: 'procesada',l: 'Procesadas', count: facets.procesada,    activeColor: '#34d399',  activeBg: 'rgba(52,211,153,0.15)',  activeBorder: 'rgba(52,211,153,0.4)' },
+              ] as const).map(({ v, l, count, activeColor, activeBg, activeBorder }) => (
                 <button
                   key={v}
                   onClick={() => setFEstado(v)}
                   style={{
-                    flex: 1, padding: '7px 4px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap',
-                    background: fEstado === v ? (v === 'pendiente' ? 'rgba(251,191,36,0.2)' : v === 'procesada' ? 'rgba(52,211,153,0.15)' : 'rgba(99,102,241,0.2)') : 'rgba(15,23,42,0.6)',
-                    border: `1px solid ${fEstado === v ? (v === 'pendiente' ? 'rgba(251,191,36,0.5)' : v === 'procesada' ? 'rgba(52,211,153,0.4)' : 'rgba(99,102,241,0.4)') : 'rgba(148,163,184,0.1)'}`,
-                    color: fEstado === v ? (v === 'pendiente' ? '#fbbf24' : v === 'procesada' ? '#34d399' : '#818cf8') : '#475569',
+                    flex: 1, padding: '6px 4px', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.15s',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+                    background: fEstado === v ? activeBg : 'rgba(15,23,42,0.6)',
+                    border: `1px solid ${fEstado === v ? activeBorder : 'rgba(148,163,184,0.1)'}`,
+                    color: fEstado === v ? activeColor : '#475569',
                   }}
-                >{l}</button>
+                >
+                  <span style={{ fontSize: '18px', fontWeight: '900', lineHeight: 1 }}>{count}</span>
+                  <span style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{l}</span>
+                </button>
               ))}
             </div>
           </div>
@@ -329,9 +359,14 @@ export default function ConciliacionPage() {
               onChange={e => setFMetodo(e.target.value)}
               style={{ width: '100%', background: 'rgba(15,23,42,0.9)', border: `1px solid ${fMetodo !== 'todos' ? 'rgba(99,102,241,0.5)' : 'rgba(148,163,184,0.12)'}`, borderRadius: '8px', padding: '7px 10px', color: fMetodo !== 'todos' ? '#e8edf5' : '#475569', fontSize: '12px', outline: 'none', cursor: 'pointer' }}
             >
-              <option value="todos">— Todos —</option>
-              <option value="">Sin asignar</option>
-              {METODOS_PAGO.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+              <option value="todos">— Todos — ({facturas.length})</option>
+              {facets.sin_asignar > 0 && <option value="">Sin asignar · {facets.sin_asignar}</option>}
+              {METODOS_PAGO.map(m => {
+                const c = facets.metodos[m.value] ?? 0;
+                return c > 0 ? (
+                  <option key={m.value} value={m.value}>{m.label} · {c}</option>
+                ) : null;
+              })}
             </select>
           </div>
 
