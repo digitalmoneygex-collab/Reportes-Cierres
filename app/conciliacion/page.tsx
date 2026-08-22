@@ -55,6 +55,12 @@ export default function ConciliacionPage() {
   const [turnoActivo, setTurnoActivo] = useState<any>(null);
   const [turnoLoaded, setTurnoLoaded] = useState(false);
 
+  // ── Filtros locales ─────────────────────────────────────────────────────────
+  const [fMetodo, setFMetodo]   = useState('todos');       // método de pago
+  const [fEstado, setFEstado]   = useState('todos');       // todos | pendiente | procesada
+  const [fTipo, setFTipo]       = useState('todos');       // todos | con_asterisco | sin_asterisco | dev
+  const [fSearch, setFSearch]   = useState('');            // búsqueda libre
+
   useEffect(() => {
     fetch('/api/turnos')
       .then(r => r.json())
@@ -145,13 +151,57 @@ export default function ConciliacionPage() {
     setTimeout(() => setToast(''), 3500);
   };
 
-  // ── Stats ───────────────────────────────────────────────────────────────────
+  // ── Stats globales (sobre TODOS los datos) ───────────────────────────────────
   const totalFacturas   = facturas.filter(f => f.tipo_doc === 'FAC').length;
   const totalDev        = facturas.filter(f => f.tipo_doc === 'DEV').length;
   const procesadas      = facturas.filter(f => f.procesado).length;
   const pendientes      = facturas.length - procesadas;
   const montoTotal      = facturas.filter(f => f.tipo_doc === 'FAC').reduce((s, f) => s + f.monto_bs, 0);
   const montoProcesado  = facturas.filter(f => f.procesado && f.tipo_doc === 'FAC').reduce((s, f) => s + f.monto_bs, 0);
+
+  // ── Filtrado local ────────────────────────────────────────────────────────────
+  const filteredFacturas = facturas.filter(f => {
+    // Tipo de documento / prefijo
+    if (fTipo === 'con_asterisco'  && !f.documento.startsWith('*')) return false;
+    if (fTipo === 'sin_asterisco'  && f.documento.startsWith('*'))  return false;
+    if (fTipo === 'dev'            && f.tipo_doc !== 'DEV')         return false;
+    if (fTipo === 'fac'            && f.tipo_doc !== 'FAC')         return false;
+
+    // Estado de conciliación
+    if (fEstado === 'pendiente'  && f.procesado)  return false;
+    if (fEstado === 'procesada'  && !f.procesado) return false;
+
+    // Método de pago asignado
+    if (fMetodo !== 'todos') {
+      const metodoActual = selects[f.id] ?? f.metodo_pago ?? '';
+      if (metodoActual !== fMetodo) return false;
+    }
+
+    // Búsqueda libre
+    if (fSearch.trim()) {
+      const q = fSearch.trim().toLowerCase();
+      const haystack = [
+        f.documento,
+        f.nombre_cliente,
+        f.metodo_pago ?? '',
+        String(f.monto_bs),
+      ].join(' ').toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+
+    return true;
+  });
+
+  const filteredCount      = filteredFacturas.length;
+  const filteredProcesadas = filteredFacturas.filter(f => f.procesado).length;
+  const filteredPendientes = filteredFacturas.length - filteredProcesadas;
+  const filteredMonto      = filteredFacturas.filter(f => f.tipo_doc === 'FAC').reduce((s, f) => s + f.monto_bs, 0);
+
+  const activeFilters = [
+    fTipo !== 'todos', fEstado !== 'todos', fMetodo !== 'todos', fSearch.trim() !== ''
+  ].filter(Boolean).length;
+
+  const resetFilters = () => { setFMetodo('todos'); setFEstado('todos'); setFTipo('todos'); setFSearch(''); };
 
   return (
     <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
@@ -216,6 +266,110 @@ export default function ConciliacionPage() {
         </div>
       </div>
 
+      {/* ── Filtros locales ─────────────────────────────────────────────── */}
+      <div className="card" style={{ padding: '16px 20px', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+          <span style={{ fontSize: '11px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            🔍 Filtros
+            {activeFilters > 0 && (
+              <span style={{ background: '#6366f1', color: 'white', borderRadius: '10px', padding: '1px 8px', fontSize: '10px', fontWeight: '700' }}>
+                {activeFilters} activo{activeFilters > 1 ? 's' : ''}
+              </span>
+            )}
+          </span>
+          {activeFilters > 0 && (
+            <button onClick={resetFilters} style={{ background: 'none', border: '1px solid rgba(148,163,184,0.15)', borderRadius: '8px', padding: '4px 12px', fontSize: '11px', color: '#94a3b8', cursor: 'pointer', fontWeight: '600' }}>
+              ✕ Limpiar filtros
+            </button>
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
+
+          {/* Tipo de documento / prefijo */}
+          <div>
+            <p style={{ fontSize: '10px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Tipo / Prefijo</p>
+            <select
+              value={fTipo}
+              onChange={e => setFTipo(e.target.value)}
+              style={{ width: '100%', background: 'rgba(15,23,42,0.9)', border: `1px solid ${fTipo !== 'todos' ? 'rgba(99,102,241,0.5)' : 'rgba(148,163,184,0.12)'}`, borderRadius: '8px', padding: '7px 10px', color: fTipo !== 'todos' ? '#e8edf5' : '#475569', fontSize: '12px', outline: 'none', cursor: 'pointer' }}
+            >
+              <option value="todos">— Todos —</option>
+              <option value="fac">🧾 Solo Facturas (FAC)</option>
+              <option value="dev">↩️ Solo Devoluciones (DEV)</option>
+              <option value="con_asterisco">⭐ Con prefijo * (ej: *0002420)</option>
+              <option value="sin_asterisco">📄 Sin prefijo (ej: 0000113)</option>
+            </select>
+          </div>
+
+          {/* Estado de conciliación */}
+          <div>
+            <p style={{ fontSize: '10px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Estado</p>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              {[['todos', '⚪ Todos'], ['pendiente', '⏳ Pendientes'], ['procesada', '✅ Procesadas']].map(([v, l]) => (
+                <button
+                  key={v}
+                  onClick={() => setFEstado(v)}
+                  style={{
+                    flex: 1, padding: '7px 4px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap',
+                    background: fEstado === v ? (v === 'pendiente' ? 'rgba(251,191,36,0.2)' : v === 'procesada' ? 'rgba(52,211,153,0.15)' : 'rgba(99,102,241,0.2)') : 'rgba(15,23,42,0.6)',
+                    border: `1px solid ${fEstado === v ? (v === 'pendiente' ? 'rgba(251,191,36,0.5)' : v === 'procesada' ? 'rgba(52,211,153,0.4)' : 'rgba(99,102,241,0.4)') : 'rgba(148,163,184,0.1)'}`,
+                    color: fEstado === v ? (v === 'pendiente' ? '#fbbf24' : v === 'procesada' ? '#34d399' : '#818cf8') : '#475569',
+                  }}
+                >{l}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Método de pago */}
+          <div>
+            <p style={{ fontSize: '10px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Método de Pago</p>
+            <select
+              value={fMetodo}
+              onChange={e => setFMetodo(e.target.value)}
+              style={{ width: '100%', background: 'rgba(15,23,42,0.9)', border: `1px solid ${fMetodo !== 'todos' ? 'rgba(99,102,241,0.5)' : 'rgba(148,163,184,0.12)'}`, borderRadius: '8px', padding: '7px 10px', color: fMetodo !== 'todos' ? '#e8edf5' : '#475569', fontSize: '12px', outline: 'none', cursor: 'pointer' }}
+            >
+              <option value="todos">— Todos —</option>
+              <option value="">Sin asignar</option>
+              {METODOS_PAGO.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+          </div>
+
+          {/* Búsqueda libre */}
+          <div>
+            <p style={{ fontSize: '10px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Buscar</p>
+            <div style={{ position: 'relative' }}>
+              <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#2d3748', display: 'flex', pointerEvents: 'none' }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </span>
+              <input
+                type="text"
+                value={fSearch}
+                onChange={e => setFSearch(e.target.value)}
+                placeholder="Doc, cliente, monto…"
+                style={{ width: '100%', background: 'rgba(15,23,42,0.9)', border: `1px solid ${fSearch ? 'rgba(99,102,241,0.5)' : 'rgba(148,163,184,0.12)'}`, borderRadius: '8px', padding: '7px 10px 7px 30px', color: '#e8edf5', fontSize: '12px', outline: 'none' }}
+              />
+              {fSearch && (
+                <button onClick={() => setFSearch('')} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#475569', cursor: 'pointer', padding: '0', fontSize: '14px', lineHeight: 1 }}>✕</button>
+              )}
+            </div>
+          </div>
+
+        </div>
+
+        {/* Resultado del filtro */}
+        {!loading && facturas.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', paddingTop: '8px', borderTop: '1px solid rgba(148,163,184,0.06)', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '12px', color: '#475569' }}>
+              Mostrando <strong style={{ color: '#818cf8' }}>{filteredCount}</strong> de {facturas.length} registros
+            </span>
+            <span style={{ fontSize: '12px', color: '#fbbf24' }}>⏳ Pendientes: <strong>{filteredPendientes}</strong></span>
+            <span style={{ fontSize: '12px', color: '#34d399' }}>✅ Procesadas: <strong>{filteredProcesadas}</strong></span>
+            {filteredMonto > 0 && <span style={{ fontSize: '12px', color: '#818cf8' }}>💰 Total: <strong>Bs. {fmtBs(filteredMonto)}</strong></span>}
+          </div>
+        )}
+      </div>
+
       {/* Table */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         
@@ -276,8 +430,14 @@ export default function ConciliacionPage() {
             <p style={{ color: '#2d3748', fontSize: '12px', marginTop: '4px' }}>Ejecuta node sync-pskloud.js para importar los datos del día.</p>
           </div>
         ) : (
-          <div style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 360px)' }}>
-            {facturas.map((f, idx) => {
+          <div style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 420px)' }}>
+            {filteredFacturas.length === 0 ? (
+              <div style={{ padding: '48px', textAlign: 'center' }}>
+                <p style={{ fontSize: '32px', marginBottom: '10px' }}>🔍</p>
+                <p style={{ color: '#475569', fontSize: '14px', fontWeight: '600' }}>Sin resultados para los filtros aplicados</p>
+                <button onClick={resetFilters} style={{ marginTop: '12px', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '8px', padding: '8px 18px', color: '#818cf8', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>Limpiar filtros</button>
+              </div>
+            ) : filteredFacturas.map((f, idx) => {
               const isDev     = f.tipo_doc === 'DEV';
               const locked    = f.procesado;
               const inProcess = processing[f.id];
@@ -397,10 +557,11 @@ export default function ConciliacionPage() {
             background: 'rgba(30,41,59,0.5)',
           }}>
             <span style={{ fontSize: '12px', color: '#475569' }}>
-              {facturas.length} registros · {procesadas} procesados · {pendientes} pendientes
+              {filteredCount} mostrados · {filteredProcesadas} procesados · {filteredPendientes} pendientes
+              {filteredCount < facturas.length && <span style={{ color: '#6366f1' }}> (filtrado de {facturas.length})</span>}
             </span>
             <span style={{ fontSize: '12px', color: '#818cf8', fontWeight: '700' }}>
-              Total: Bs. {fmtBs(montoTotal)}
+              Total: Bs. {fmtBs(filteredMonto)}
             </span>
           </div>
         )}
