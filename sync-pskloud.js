@@ -330,7 +330,7 @@ async function sync() {
       const [articulosRaw] = await conn.query(
         `SELECT m.documento, c.fechayhora, m.grupo, m.nombre, m.cantidad
          FROM opermv m
-         LEFT JOIN operclit c ON m.documento = ${selectJoinDoc}
+         LEFT JOIN operclit c ON TRIM(m.documento) = TRIM(${selectJoinDoc})
          WHERE DATE(m.fechadoc) = ?
            AND m.tipodoc = 'FAC'
            AND m.grupo IN ('01','02','03','04')`,
@@ -369,11 +369,14 @@ async function sync() {
          }
          
          const articulosPayload = Object.values(payloadMap);
-
          
+         // 1. Borrar todos los articulos de hoy para evitar filas huerfanas (facturas eliminadas en PSKloud)
+         await supabase.from('pskloud_articulos').delete().eq('fecha', today);
+
+         // 2. Insertar frescos
          const { error: artError } = await supabase
            .from('pskloud_articulos')
-           .upsert(articulosPayload, { onConflict: 'documento,nombre' });
+           .insert(articulosPayload);
            
          if (artError) {
            console.error(`  ERROR al subir articulos: ${artError.message}`);
