@@ -222,7 +222,7 @@ export async function GET(request: Request) {
       }
 
       const exists = acc.find((m: any) => m.metodo === metodoPagoReal);
-      const isNegative = curr.tipo_doc === 'DEV' || curr.tipo_doc === 'N/C' || curr.tipo_doc === 'NC' || isDevolucionManual || curr.metodo_pago === 'devolucion' || curr.metodo_pago === 'gasto';
+      const isNegative = curr.tipo_doc === 'DEV' || curr.tipo_doc === 'N/C' || curr.tipo_doc === 'NC' || isDevolucionManual || curr.metodo_pago === 'devolucion';
       const monto = isNegative ? -Math.abs(Number(curr.monto_bs)) : Math.abs(Number(curr.monto_bs));
 
       if (exists) {

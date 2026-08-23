@@ -256,10 +256,24 @@ export default function PskloudPanel({ data, loading }: { data: PskloudData | nu
               <span style={{ fontSize: '11px', color: '#818cf8', fontWeight: '800' }}>VENTAS TOTALES</span>
               <span style={{ textAlign: 'right' }}>
                 <span style={{ display: 'block', fontSize: '13px', color: '#818cf8', fontWeight: '800' }}>
-                  {fmtBs(metodosPago.reduce((acc, curr) => acc + curr.totalBs, 0) - (data.gastos?.totalBs || 0))}
+                  {fmtBs(metodosPago.reduce((acc, curr) => acc + curr.totalBs, 0))}
                 </span>
                 {corteCaja?.tasa > 0 && (
                   <span style={{ display: 'block', fontSize: '11px', color: '#a5b4fc' }}>
+                    $ {(metodosPago.reduce((acc, curr) => acc + curr.totalBs, 0) / corteCaja.tasa).toFixed(2)} USD
+                  </span>
+                )}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0 4px', borderTop: '1px solid rgba(148,163,184,0.15)', marginTop: '6px' }}>
+              <span style={{ fontSize: '11px', color: '#34d399', fontWeight: '800' }}>DINERO RECOLECTADO</span>
+              <span style={{ textAlign: 'right' }}>
+                <span style={{ display: 'block', fontSize: '13px', color: '#34d399', fontWeight: '800' }}>
+                  {fmtBs(metodosPago.reduce((acc, curr) => acc + curr.totalBs, 0) - (data.gastos?.totalBs || 0))}
+                </span>
+                {corteCaja?.tasa > 0 && (
+                  <span style={{ display: 'block', fontSize: '11px', color: '#6ee7b7' }}>
                     $ {((metodosPago.reduce((acc, curr) => acc + curr.totalBs, 0) - (data.gastos?.totalBs || 0)) / corteCaja.tasa).toFixed(2)} USD
                   </span>
                 )}

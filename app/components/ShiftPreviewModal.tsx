@@ -283,10 +283,24 @@ export default function ShiftPreviewModal({
                     <span style={{ fontSize: '12px', color: '#818cf8', fontWeight: '800' }}>TOTAL</span>
                     <div style={{ textAlign: 'right' }}>
                       <span style={{ display: 'block', fontSize: '12px', color: '#818cf8', fontWeight: '800', fontFamily: 'monospace' }}>
-                        Bs. {(data.metodosPago.reduce((a, c) => a + c.totalBs, 0) - (data.pskloud.totalGastosBs || 0)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                        Bs. {(data.metodosPago.reduce((a, c) => a + c.totalBs, 0)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                       </span>
                       {data.pskloud.tasa > 0 && (
                         <span style={{ display: 'block', fontSize: '10px', color: '#a5b4fc' }}>
+                          ~ $ {((data.metodosPago.reduce((a, c) => a + c.totalBs, 0)) / data.pskloud.tasa).toFixed(2)} USD
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: '1px solid rgba(148,163,184,0.15)', marginTop: '2px' }}>
+                    <span style={{ fontSize: '12px', color: '#34d399', fontWeight: '800' }}>DINERO RECOLECTADO</span>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ display: 'block', fontSize: '12px', color: '#34d399', fontWeight: '800', fontFamily: 'monospace' }}>
+                        Bs. {(data.metodosPago.reduce((a, c) => a + c.totalBs, 0) - (data.pskloud.totalGastosBs || 0)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                      </span>
+                      {data.pskloud.tasa > 0 && (
+                        <span style={{ display: 'block', fontSize: '10px', color: '#6ee7b7' }}>
                           ~ $ {((data.metodosPago.reduce((a, c) => a + c.totalBs, 0) - (data.pskloud.totalGastosBs || 0)) / data.pskloud.tasa).toFixed(2)} USD
                         </span>
                       )}
