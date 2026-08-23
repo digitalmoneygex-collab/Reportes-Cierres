@@ -47,7 +47,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { descripcion, moneda, monto, turno_id } = body;
+    const { descripcion, moneda, monto, turno_id, referencia } = body;
     
     if (!descripcion || !moneda || !monto) {
       return NextResponse.json({ ok: false, error: 'Faltan campos requeridos' }, { status: 400 });
@@ -74,6 +74,7 @@ export async function POST(request: Request) {
       .from('otros_gastos')
       .insert({
         descripcion,
+        referencia: referencia || null,
         moneda,
         monto_bs: Number(monto_bs.toFixed(2)),
         monto_usd: Number(monto_usd.toFixed(2)),

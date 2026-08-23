@@ -6,6 +6,7 @@ type Gasto = {
   id: string;
   created_at: string;
   descripcion: string;
+  referencia: string | null;
   moneda: string;
   monto_bs: number;
   monto_usd: number;
@@ -22,6 +23,7 @@ export default function GastosPage() {
   
   // Form states
   const [descripcion, setDescripcion] = useState('');
+  const [referencia, setReferencia] = useState('');
   const [moneda, setMoneda] = useState('BS');
   const [monto, setMonto] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -69,11 +71,12 @@ export default function GastosPage() {
       const res = await fetch('/api/gastos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ descripcion, moneda, monto: numMonto, turno_id })
+        body: JSON.stringify({ descripcion, referencia, moneda, monto: numMonto, turno_id })
       });
       const json = await res.json();
       if (json.ok) {
         setDescripcion('');
+        setReferencia('');
         setMonto('');
         loadData();
       } else {
@@ -116,6 +119,17 @@ export default function GastosPage() {
                 value={descripcion}
                 onChange={e => setDescripcion(e.target.value)}
                 required
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '6px' }}>Referencia / Cédula / Factura</label>
+              <input 
+                type="text" 
+                className="input-field" 
+                placeholder="Opcional. Ej. V-12345678, Nro. 123" 
+                value={referencia}
+                onChange={e => setReferencia(e.target.value)}
               />
             </div>
 
@@ -166,7 +180,8 @@ export default function GastosPage() {
             <table className="w-full">
               <thead>
                 <tr>
-                  <th style={{ width: '40%' }}>Descripción</th>
+                  <th style={{ width: '30%' }}>Descripción</th>
+                  <th style={{ width: '20%' }}>Referencia</th>
                   <th>Monto Ref.</th>
                   <th>Total Bs.</th>
                   <th>Total USD</th>
@@ -176,16 +191,17 @@ export default function GastosPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>Cargando gastos...</td>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>Cargando gastos...</td>
                   </tr>
                 ) : gastos.length === 0 ? (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: 'center', padding: '30px', color: '#475569' }}>No hay gastos registrados en este turno.</td>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: '#475569' }}>No hay gastos registrados en este turno.</td>
                   </tr>
                 ) : (
                   gastos.map(g => (
                     <tr key={g.id}>
                       <td style={{ fontWeight: '500' }}>{g.descripcion}</td>
+                      <td style={{ fontSize: '12px', color: '#94a3b8' }}>{g.referencia || '-'}</td>
                       <td>
                         <span style={{ 
                           background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px' 
@@ -212,7 +228,7 @@ export default function GastosPage() {
               {gastos.length > 0 && (
                 <tfoot>
                   <tr style={{ background: 'rgba(0,0,0,0.2)' }}>
-                    <td colSpan={2} style={{ textAlign: 'right', fontWeight: '700', color: '#e8edf5' }}>Total Gastos:</td>
+                    <td colSpan={3} style={{ textAlign: 'right', fontWeight: '700', color: '#e8edf5' }}>Total Gastos:</td>
                     <td style={{ color: '#34d399', fontWeight: '800' }}>{fmtBs(gastos.reduce((s, g) => s + g.monto_bs, 0))}</td>
                     <td style={{ color: '#818cf8', fontWeight: '800' }}>{fmtUsd(gastos.reduce((s, g) => s + g.monto_usd, 0))}</td>
                     <td></td>
