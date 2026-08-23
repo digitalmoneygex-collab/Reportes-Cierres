@@ -90,8 +90,14 @@ export async function POST(request: Request) {
       const textMsg = msg.message?.conversation || (msg.message?.extendedTextMessage as any)?.text || '';
       const textLower = textMsg.toLowerCase();
       const isReceiptText = !isImage && textMsg && (
-        (textLower.includes('referencia') || textLower.includes('ref')) && 
-        (textLower.includes('monto') || textLower.includes('bs'))
+        textLower.includes('referencia') || 
+        textLower.includes('ref') || 
+        textLower.includes('monto') || 
+        textLower.includes('bs') || 
+        textLower.includes('ves') || 
+        textLower.includes('operacion') || 
+        textLower.includes('pago movil') ||
+        textLower.includes('transferencia')
       );
 
       if (!isImage && !isReceiptText) return false;
