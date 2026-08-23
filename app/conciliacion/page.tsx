@@ -121,8 +121,8 @@ export default function ConciliacionPage() {
 
   // Recargar cuando el usuario cambia la fecha manualmente
   useEffect(() => { 
-    if (fecha && turnoLoaded) load(fecha); 
-  }, [fecha, turnoLoaded, load]);
+    if (fecha && turnoLoaded) load(fecha, turnoActivo); 
+  }, [fecha, turnoLoaded, turnoActivo, load]);
 
   // ── Procesar factura ────────────────────────────────────────────────────────
   const procesar = async (id: string) => {

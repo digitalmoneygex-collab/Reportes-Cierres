@@ -37,13 +37,14 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const dateParam = searchParams.get('date');
     const abierto_at = searchParams.get('abierto_at');
+    const cerrado_at = searchParams.get('cerrado_at');
     const targetDate = await resolveBusinessDate(dateParam);
 
     let query = supabaseAdmin.from('pskloud_facturas').select('*');
 
     if (abierto_at) {
       const start = new Date(abierto_at);
-      const end = new Date(); // hasta ahora
+      const end = cerrado_at ? new Date(cerrado_at) : new Date();
       query = query
         .gte('fechayhora', start.toISOString())
         .lte('fechayhora', end.toISOString())
