@@ -221,11 +221,14 @@ export default function DashboardPage() {
               >
                 <option value="activo">Turno Actual (Activo)</option>
                 <option value="consolidado">Consolidado del Día</option>
-                {turnosList.filter(t => t.cerrado_at).map(t => (
-                  <option key={t.id} value={String(t.id)}>
-                    Cerrado: {new Date(t.abierto_at).toLocaleTimeString('es-VE', {hour: '2-digit', minute:'2-digit'})} - {new Date(t.cerrado_at!).toLocaleTimeString('es-VE', {hour: '2-digit', minute:'2-digit'})}
-                  </option>
-                ))}
+                {turnosList.filter(t => t.cerrado_at).map(t => {
+                  const d = new Date(t.abierto_at);
+                  return (
+                    <option key={t.id} value={String(t.id)}>
+                      Cerrado: {d.getDate()}/{d.getMonth()+1} ({d.toLocaleTimeString('es-VE', {hour: '2-digit', minute:'2-digit'})} - {new Date(t.cerrado_at!).toLocaleTimeString('es-VE', {hour: '2-digit', minute:'2-digit'})})
+                    </option>
+                  );
+                })}
               </select>
             )}
           </div>

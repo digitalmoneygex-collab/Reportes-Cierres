@@ -30,55 +30,12 @@ export async function GET(request: Request) {
     .eq('id', user.id)
     .single();
 
-  const { searchParams } = new URL(request.url);
-  const dateParam = searchParams.get('date');
-
-  // Determinar los límites de tiempo (start y end)
-  let start: Date;
-  let end: Date;
-
-  if (dateParam) {
-    start = new Date(`${dateParam}T00:00:00.000-04:00`);
-    end = new Date(`${dateParam}T23:59:59.999-04:00`);
-  } else {
-    // Si no se especifica fecha, usar el día operativo actual
-    const { data: config } = await supabaseAdmin.from('configuracion').select('start_time').eq('id', 1).single();
-    const startTime = config?.start_time || '06:00';
-    
-    const now = new Date();
-    const vzDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Caracas' }));
-    
-    const [sh, sm] = startTime.split(':').map(Number);
-    const resetMinutes = sh * 60 + sm;
-    const currentMinutes = vzDate.getHours() * 60 + vzDate.getMinutes();
-    
-    if (currentMinutes < resetMinutes) {
-      vzDate.setDate(vzDate.getDate() - 1);
-    }
-    
-    const y = vzDate.getFullYear();
-    const m = String(vzDate.getMonth() + 1).padStart(2, '0');
-    const d = String(vzDate.getDate()).padStart(2, '0');
-    
-    start = new Date(`${y}-${m}-${d}T${startTime}:00.000-04:00`);
-    
-    const nextDay = new Date(vzDate);
-    nextDay.setDate(nextDay.getDate() + 1);
-    const ny = nextDay.getFullYear();
-    const nm = String(nextDay.getMonth() + 1).padStart(2, '0');
-    const nd = String(nextDay.getDate()).padStart(2, '0');
-    
-    end = new Date(`${ny}-${nm}-${nd}T${startTime}:00.000-04:00`);
-    end = new Date(end.getTime() - 1);
-  }
-
-  // Buscar todos los turnos que empezaron dentro de este día operativo
+  // Buscar los últimos 20 turnos
   let query = supabase
     .from('turnos')
     .select('*')
-    .gte('abierto_at', start.toISOString())
-    .lte('abierto_at', end.toISOString())
-    .order('abierto_at', { ascending: false });
+    .order('abierto_at', { ascending: false })
+    .limit(20);
 
   // Si no es supervisor, solo buscar sus propios turnos
   if (perfil?.rol !== 'SUPERVISOR') {
