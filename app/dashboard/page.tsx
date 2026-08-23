@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import PskloudPanel from '@/app/components/PskloudPanel';
 import ShiftPreviewModal from '@/app/components/ShiftPreviewModal';
 import { useRouter } from 'next/navigation';
+import { generateShiftReportPdf } from '@/app/lib/pdfGenerator';
 
 type Pago = { id: string; created_at: string; telefono_emisor: string; monto_bs: number; monto_usd?: number; referencia: string; banco_origen: string; metodo: string; procesado: boolean; };
 type WaInstance = { name: string; connectionStatus: string; profileName: string | null; number: string | null; };
@@ -29,7 +30,49 @@ export default function DashboardPage() {
   const [newCount, setNewCount] = useState(0);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const prevIdsRef = useRef<Set<string>>(new Set());
+
+  const handleDownloadPdf = async () => {
+    setIsGeneratingPdf(true);
+    try {
+      let url = '/api/turnos/preview?';
+      if (selectedView === 'consolidado') {
+        url += selectedDate ? `date=${selectedDate}` : 'date=';
+      } else if (effectiveTurno) {
+        url += `start=${encodeURIComponent(effectiveTurno.abierto_at)}`;
+        if (effectiveTurno.cerrado_at) {
+          url += `&end=${encodeURIComponent(effectiveTurno.cerrado_at)}`;
+        }
+      } else {
+        throw new Error('No hay turno válido seleccionado');
+      }
+
+      const res = await fetch(url);
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || 'Error al generar vista previa');
+      
+      const data = json.data;
+      generateShiftReportPdf({
+        fecha: new Date(data.rango.start).toLocaleDateString('es-VE'),
+        horaApertura: new Date(data.rango.start).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }),
+        horaCierre: data.rango.end ? new Date(data.rango.end).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }),
+        cajeroNombre: data.cajero?.nombre || (selectedView === 'consolidado' ? 'CONSOLIDADO' : 'CAJERO DESCONOCIDO'),
+        cajeroCedula: data.cajero?.cedula || 'N/A',
+        supervisorNombre: perfil?.nombre_completo,
+        pskloud: data.pskloud,
+        metodosPago: data.metodosPago || [],
+        pagos: data.pagos || { totalBs: 0, registradosCount: 0, procesadosCount: 0 },
+        articulos: data.articulos || { burguer: [], pasteles: [], reposteria: [] },
+        insumos: data.insumos || undefined,
+      });
+    } catch (err) {
+      console.error('Error generando PDF:', err);
+      alert('Hubo un error al generar el PDF.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
   const loadTurno = useCallback(async () => {
     try {
@@ -271,6 +314,22 @@ export default function DashboardPage() {
           {selectedView === 'activo' && activeTurno && (
             <button className="btn btn-sm" style={{ background: '#ef4444', color: 'white', border: 'none' }} onClick={() => setPreviewOpen(true)}>
               Cerrar Turno
+            </button>
+          )}
+
+          {(selectedView !== 'activo' || !activeTurno) && (
+            <button className="btn btn-sm" style={{ background: '#3b82f6', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: '6px' }} disabled={isGeneratingPdf} onClick={handleDownloadPdf}>
+              {isGeneratingPdf ? (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                  Generando...
+                </>
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Descargar PDF
+                </>
+              )}
             </button>
           )}
         </div>
