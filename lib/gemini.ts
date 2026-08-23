@@ -6,7 +6,7 @@ export async function readPaymentReceipt(base64Image: string | null, textContent
   if (!process.env.GEMINI_API_KEY) {
     throw new Error('Falta GEMINI_API_KEY');
   }
-  const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
   // Add retry logic for 503 errors
   let result;
@@ -45,10 +45,17 @@ export async function readPaymentReceipt(base64Image: string | null, textContent
       });
       break; // Success, exit loop
     } catch (error: any) {
-      console.error(`Gemini API Error: ${error.message}`);
+      const errMsg = error.message || '';
+      console.error(`Gemini API Error: ${errMsg}`);
+      
+      // If it's a Rate Limit (429), do not retry immediately, throw to let the caller handle it.
+      if (errMsg.includes('429') || errMsg.includes('Too Many Requests') || errMsg.includes('Quota exceeded')) {
+        throw new Error(`[RATE_LIMIT] Límite gratuito de Gemini alcanzado (15 por minuto). Espera 1 minuto y vuelve a intentarlo.`);
+      }
+
       retries--;
       if (retries === 0) {
-        throw new Error(`Error en OCR después de 3 intentos: ${error.message}`);
+        throw new Error(`Error en OCR después de 3 intentos: ${errMsg}`);
       }
       // Wait 2 seconds before retrying
       await new Promise(resolve => setTimeout(resolve, 2000));

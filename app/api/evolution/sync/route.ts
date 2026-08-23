@@ -106,12 +106,19 @@ export async function POST(request: Request) {
       return inRange(msgDate, startTime, endTime);
     });
 
+    // Sort oldest to newest so we process chronologically
+    eligible.sort((a, b) => a.messageTimestamp - b.messageTimestamp);
+    
+    // Limit to 10 messages max per sync to avoid Vercel timeout and severe rate limits
+    const toProcess = eligible.slice(0, 10);
+
     let procesados = 0;
     let duplicados = 0;
     let errores    = 0;
     const errorDetails: string[] = [];
 
-    for (const msg of eligible) {
+    for (let i = 0; i < toProcess.length; i++) {
+      const msg = toProcess[i];
       const messageId = msg.key.id;
 
       // Skip si ya existe en BD
@@ -147,6 +154,12 @@ export async function POST(request: Request) {
         }
       }
 
+      // Add a small delay between requests (4 seconds) to avoid Gemini rate limit (15 RPM)
+      // Only delay if it's not the first item
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 4000));
+      }
+
       // OCR o extracción
       let extractedData;
       try { 
@@ -155,6 +168,12 @@ export async function POST(request: Request) {
       catch (err: any) { 
         errores++; 
         errorDetails.push(`OCR Error: ${err.message}`);
+        
+        // If it's a hard rate limit, stop processing the rest of the batch
+        if (err.message.includes('[RATE_LIMIT]')) {
+          errorDetails.push('Proceso detenido para no exceder cuota de Gemini. Por favor espera 1 minuto y sincroniza de nuevo.');
+          break;
+        }
         continue; 
       }
 
