@@ -80,9 +80,14 @@ export default function ConciliacionPage() {
     setError('');
     setNoTable(false);
     try {
+      const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Caracas' });
       let url = d ? `/api/conciliacion?date=${d}` : '/api/conciliacion';
-      if (!d && currentTurno) {
-        url += `?abierto_at=${encodeURIComponent(currentTurno.abierto_at)}`;
+      
+      if ((!d || d === hoy) && currentTurno) {
+        url = `/api/conciliacion?abierto_at=${encodeURIComponent(currentTurno.abierto_at)}`;
+        if (currentTurno.cerrado_at) {
+          url += `&cerrado_at=${encodeURIComponent(currentTurno.cerrado_at)}`;
+        }
       }
       const res  = await fetch(url, { cache: 'no-store' });
       const data = await res.json();

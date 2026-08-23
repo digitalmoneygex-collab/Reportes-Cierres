@@ -323,12 +323,17 @@ async function sync() {
       }
       
       // ── Subir artículos detallados para turnos ─────────────────
+      // Join con operclit para capturar la hora EXACTA de la factura (fechayhora real)
+      const selectJoinDoc = colDoc ? `c.\`${colDoc}\`` : `c.documento`;
+      const selectDocArt = colDoc ? `m.\`${colDoc}\`` : `m.documento`;
+      
       const [articulosRaw] = await conn.query(
-        `SELECT documento, fechayhora, grupo, nombre, cantidad
-         FROM opermv
-         WHERE DATE(fechadoc) = ?
-           AND tipodoc = 'FAC'
-           AND grupo IN ('01','02','03','04')`,
+        `SELECT m.documento, c.fechayhora, m.grupo, m.nombre, m.cantidad
+         FROM opermv m
+         LEFT JOIN operclit c ON m.documento = ${selectJoinDoc}
+         WHERE DATE(m.fechadoc) = ?
+           AND m.tipodoc = 'FAC'
+           AND m.grupo IN ('01','02','03','04')`,
         [today]
       );
       

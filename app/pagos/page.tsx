@@ -49,7 +49,22 @@ export default function PagosPage() {
   const loadPagos = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ date: filterDate, limit: '500' });
+      const params = new URLSearchParams({ limit: '500' });
+      
+      const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Caracas' });
+      if (filterDate === hoy) {
+        const tRes = await fetch('/api/turnos');
+        const tJson = await tRes.json();
+        if (tJson.ok && tJson.active && tJson.turno) {
+          params.set('abierto_at', tJson.turno.abierto_at);
+          if (tJson.turno.cerrado_at) params.set('cerrado_at', tJson.turno.cerrado_at);
+        } else {
+          params.set('date', filterDate);
+        }
+      } else {
+        params.set('date', filterDate);
+      }
+
       if (filterBanco !== 'Todos') params.set('banco', filterBanco);
       if (search.trim()) params.set('search', search.trim());
 
