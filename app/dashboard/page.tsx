@@ -14,7 +14,10 @@ const fmtDate = () => new Date().toLocaleDateString('es-VE', { weekday: 'long', 
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [turno, setTurno] = useState<Turno | null>(null);
+  const [activeTurno, setActiveTurno] = useState<Turno | null>(null);
+  const [turnosList, setTurnosList] = useState<Turno[]>([]);
+  const [selectedView, setSelectedView] = useState<string>('activo'); // 'activo', 'consolidado', o ID
+  const [perfil, setPerfil] = useState<any>(null);
   const [loadingTurno, setLoadingTurno] = useState(true);
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [waInst, setWaInst] = useState<WaInstance | null>(null);
@@ -32,10 +35,18 @@ export default function DashboardPage() {
     try {
       const res = await fetch('/api/turnos');
       const json = await res.json();
-      if (json.ok && json.active) {
-        setTurno(json.turno);
-      } else {
-        setTurno(null);
+      if (json.ok) {
+        if (json.active) setActiveTurno(json.turno);
+        else setActiveTurno(null);
+        setPerfil(json.perfil);
+
+        if (json.perfil?.rol === 'SUPERVISOR') {
+          const listRes = await fetch('/api/turnos/list');
+          const listJson = await listRes.json();
+          if (listJson.ok) {
+            setTurnosList(listJson.turnos);
+          }
+        }
       }
     } catch { }
     setLoadingTurno(false);
@@ -46,7 +57,7 @@ export default function DashboardPage() {
       const res = await fetch('/api/turnos', { method: 'POST' });
       const json = await res.json();
       if (json.ok && json.turno) {
-        setTurno(json.turno);
+        setActiveTurno(json.turno);
       }
     } catch (e) {
       alert('Error abriendo turno');
@@ -61,7 +72,7 @@ export default function DashboardPage() {
       });
       const json = await res.json();
       if (json.ok) {
-        setTurno(null);
+        setActiveTurno(null);
         setPskloudData(null);
         setPagos([]);
         setNewCount(0);
@@ -84,7 +95,12 @@ export default function DashboardPage() {
   const loadPagos = useCallback(async (dateFilter?: string, currentTurno?: Turno) => {
     try {
       let qs = dateFilter ? `?date=${dateFilter}` : '';
-      if (!dateFilter && currentTurno) qs = `?abierto_at=${encodeURIComponent(currentTurno.abierto_at)}`;
+      if (!dateFilter && currentTurno) {
+        qs = `?abierto_at=${encodeURIComponent(currentTurno.abierto_at)}`;
+        if (currentTurno.cerrado_at) {
+          qs += `&cerrado_at=${encodeURIComponent(currentTurno.cerrado_at)}`;
+        }
+      }
       const res = await fetch(`/api/pagos${qs ? qs + '&limit=50' : '?limit=50'}`, { cache: 'no-store' });
       const json = await res.json();
       if (json.ok && json.data) {
@@ -109,7 +125,12 @@ export default function DashboardPage() {
   const loadPskloud = useCallback(async (dateFilter?: string, currentTurno?: Turno) => {
     try {
       let qs = dateFilter ? `?date=${dateFilter}` : '';
-      if (!dateFilter && currentTurno) qs = `?abierto_at=${encodeURIComponent(currentTurno.abierto_at)}`;
+      if (!dateFilter && currentTurno) {
+        qs = `?abierto_at=${encodeURIComponent(currentTurno.abierto_at)}`;
+        if (currentTurno.cerrado_at) {
+          qs += `&cerrado_at=${encodeURIComponent(currentTurno.cerrado_at)}`;
+        }
+      }
       const res = await fetch(`/api/pskloud/resumen${qs}`, { cache: 'no-store' });
       const json = await res.json();
       if (json.ok) setPskloudData(json);
@@ -121,29 +142,36 @@ export default function DashboardPage() {
     loadTurno();
   }, [loadTurno]);
 
+  const effectiveTurno = React.useMemo(() => {
+    if (selectedView === 'activo') return activeTurno;
+    if (selectedView === 'consolidado') return null;
+    return turnosList.find(t => String(t.id) === selectedView) || null;
+  }, [selectedView, activeTurno, turnosList]);
+
   useEffect(() => {
     if (loadingTurno) return;
-    if (!turno && !selectedDate) return;
+    if (selectedView === 'activo' && !activeTurno && !selectedDate) return;
 
-    loadPagos(selectedDate, turno || undefined);
+    loadPagos(selectedDate, effectiveTurno || undefined);
     loadWA();
     loadTasa();
-    loadPskloud(selectedDate, turno || undefined);
+    loadPskloud(selectedDate, effectiveTurno || undefined);
     
     if (selectedDate) return;
+    if (effectiveTurno?.cerrado_at) return; // No refrescar si es un turno cerrado
 
-    const id1 = setInterval(() => loadPagos(selectedDate, turno || undefined), 10000);
+    const id1 = setInterval(() => loadPagos(selectedDate, effectiveTurno || undefined), 10000);
     const id2 = setInterval(() => loadWA(), 15000);
     const id3 = setInterval(() => loadTasa(), 60000);
-    const id4 = setInterval(() => loadPskloud(selectedDate, turno || undefined), 60000);
+    const id4 = setInterval(() => loadPskloud(selectedDate, effectiveTurno || undefined), 60000);
     return () => { clearInterval(id1); clearInterval(id2); clearInterval(id3); clearInterval(id4); };
-  }, [loadingTurno, turno, selectedDate, loadPagos, loadWA, loadTasa, loadPskloud]);
+  }, [loadingTurno, selectedView, activeTurno, selectedDate, effectiveTurno, loadPagos, loadWA, loadTasa, loadPskloud]);
 
   if (loadingTurno) {
     return <div style={{ padding: 40, color: '#e8edf5' }}>Cargando turno...</div>;
   }
 
-  if (!turno && !selectedDate) {
+  if (!activeTurno && !selectedDate && selectedView === 'activo') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '80vh' }}>
         <h2 style={{ color: '#e8edf5', fontSize: '24px', marginBottom: '8px' }}>No tienes un turno activo</h2>
@@ -170,21 +198,46 @@ export default function DashboardPage() {
 
   return (
     <div className="animate-fade-in">
-      {turno && (
+      {activeTurno && (
         <ShiftPreviewModal 
           isOpen={previewOpen} 
           onClose={() => setPreviewOpen(false)} 
           onConfirm={closeTurno} 
-          start={turno.abierto_at} 
+          start={activeTurno.abierto_at} 
         />
       )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <p className="eyebrow" style={{ marginBottom: '4px' }}>{fmtDate()}</p>
-          <h1 className="page-title">Dashboard</h1>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '6px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <h1 className="page-title" style={{ margin: 0 }}>Dashboard</h1>
+            {perfil?.rol === 'SUPERVISOR' && (
+              <select 
+                style={{
+                  background: '#1e293b', color: 'white', border: '1px solid #334155', borderRadius: '6px', padding: '4px 12px', fontSize: '14px', cursor: 'pointer', outline: 'none'
+                }}
+                value={selectedView}
+                onChange={(e) => setSelectedView(e.target.value)}
+              >
+                <option value="activo">Turno Actual (Activo)</option>
+                <option value="consolidado">Consolidado del Día</option>
+                {turnosList.filter(t => t.cerrado_at).map(t => (
+                  <option key={t.id} value={String(t.id)}>
+                    Cerrado: {new Date(t.abierto_at).toLocaleTimeString('es-VE', {hour: '2-digit', minute:'2-digit'})} - {new Date(t.cerrado_at!).toLocaleTimeString('es-VE', {hour: '2-digit', minute:'2-digit'})}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '10px', flexWrap: 'wrap' }}>
             <p className="page-subtitle" style={{ margin: 0 }}>
-              {selectedDate ? 'Vista de historial' : `Turno Abierto desde: ${new Date(turno!.abierto_at).toLocaleTimeString('es-VE')}`}
+              {selectedView === 'activo' && activeTurno 
+                ? `Turno Abierto desde: ${new Date(activeTurno.abierto_at).toLocaleTimeString('es-VE')}`
+                : selectedView === 'consolidado' 
+                ? 'Consolidado del Día' 
+                : effectiveTurno?.cerrado_at 
+                ? `Turno Cerrado (${new Date(effectiveTurno.abierto_at).toLocaleTimeString('es-VE')} - ${new Date(effectiveTurno.cerrado_at).toLocaleTimeString('es-VE')})`
+                : 'Sin Turno Activo'}
             </p>
             {tasa > 0 && (
               <span style={{
@@ -196,6 +249,7 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {newCount > 0 && !selectedDate && (
             <button className="badge badge-green" style={{ cursor: 'pointer', border: 'none' }} onClick={() => setNewCount(0)}>
@@ -205,15 +259,16 @@ export default function DashboardPage() {
           
           <button className="btn btn-ghost btn-sm" disabled={isRefreshing} onClick={async () => {
             setIsRefreshing(true);
-            try { await Promise.all([loadPagos(selectedDate, turno || undefined), loadWA(), loadTasa(), loadPskloud(selectedDate, turno || undefined)]); } finally { setIsRefreshing(false); }
+            try { await Promise.all([loadPagos(selectedDate, effectiveTurno || undefined), loadWA(), loadTasa(), loadPskloud(selectedDate, effectiveTurno || undefined)]); } finally { setIsRefreshing(false); }
           }}>Refrescar</button>
 
-          {!selectedDate && turno && (
+          {selectedView === 'activo' && activeTurno && (
             <button className="btn btn-sm" style={{ background: '#ef4444', color: 'white', border: 'none' }} onClick={() => setPreviewOpen(true)}>
               Cerrar Turno
             </button>
           )}
         </div>
+      </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '28px' }}>
