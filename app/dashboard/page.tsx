@@ -223,9 +223,12 @@ export default function DashboardPage() {
                 <option value="consolidado">Consolidado del Día</option>
                 {turnosList.filter(t => t.cerrado_at).map(t => {
                   const d = new Date(t.abierto_at);
+                  const dia = String(d.getDate()).padStart(2, '0');
+                  const mes = String(d.getMonth() + 1).padStart(2, '0');
+                  const anio = String(d.getFullYear()).slice(-2);
                   return (
                     <option key={t.id} value={String(t.id)}>
-                      Cerrado: {d.getDate()}/{d.getMonth()+1} ({d.toLocaleTimeString('es-VE', {hour: '2-digit', minute:'2-digit'})} - {new Date(t.cerrado_at!).toLocaleTimeString('es-VE', {hour: '2-digit', minute:'2-digit'})})
+                      Cerrado: ({dia}-{mes}-{anio}) {d.toLocaleTimeString('es-VE', {hour: '2-digit', minute:'2-digit'})} - {new Date(t.cerrado_at!).toLocaleTimeString('es-VE', {hour: '2-digit', minute:'2-digit'})}
                     </option>
                   );
                 })}

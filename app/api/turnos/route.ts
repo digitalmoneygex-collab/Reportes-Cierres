@@ -61,31 +61,9 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 });
 
-  // Buscar el ultimo turno CERRADO EN EL SISTEMA (de cualquier usuario) para saber de donde partir.
-  // Si no hay hoy, empezar desde las 06:00.
-  const now = new Date();
-  
-  // Buscar último turno cerrado (global o del dia, busquemos el ultimo cerrado globalmente)
-  const { data: lastTurno } = await supabase
-    .from('turnos')
-    .select('cerrado_at')
-    .not('cerrado_at', 'is', null)
-    .order('cerrado_at', { ascending: false })
-    .limit(1)
-    .single();
-
+  // Ya no heredamos la hora del turno anterior. 
+  // El turno inicia exactamente en el momento en que se le da a "Abrir Turno".
   let abierto_at = new Date();
-  
-  // Si existe un último turno cerrado, y fue HOY (despues de las 6am), heredamos esa hora para no dejar gaps.
-  // Pero para simplicidad, heredamos la hora exacta del ultimo cierre sin importar nada. 
-  // Wait, si el ultimo cierre fue ayer a las 11pm, hoy el nuevo turno heredaría desde las 11pm. Eso esta bien, 
-  // incluye las ventas de la madrugada si hubo.
-  if (lastTurno && lastTurno.cerrado_at) {
-    abierto_at = new Date(lastTurno.cerrado_at);
-  } else {
-    // Fallback: 6:00 AM de hoy
-    abierto_at.setHours(6, 0, 0, 0);
-  }
 
   // Crear el turno
   const { data: newTurno, error } = await supabase
