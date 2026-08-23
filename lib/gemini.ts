@@ -6,7 +6,7 @@ export async function readPaymentReceipt(base64Image: string | null, textContent
   if (!process.env.GEMINI_API_KEY) {
     throw new Error('Falta GEMINI_API_KEY');
   }
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
 
   // Add retry logic for 503 errors
   let result;
