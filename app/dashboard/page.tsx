@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import PskloudPanel from '@/app/components/PskloudPanel';
 import ShiftPreviewModal from '@/app/components/ShiftPreviewModal';
 import { useRouter } from 'next/navigation';
@@ -142,7 +142,7 @@ export default function DashboardPage() {
     loadTurno();
   }, [loadTurno]);
 
-  const effectiveTurno = React.useMemo(() => {
+  const effectiveTurno = useMemo(() => {
     if (selectedView === 'activo') return activeTurno;
     if (selectedView === 'consolidado') return null;
     return turnosList.find(t => String(t.id) === selectedView) || null;
