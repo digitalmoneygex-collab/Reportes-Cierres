@@ -33,7 +33,7 @@ export default function PagosPage() {
   const [pagos, setPagos]       = useState<Pago[]>([]);
   const [tasa, setTasa]         = useState<number>(0);
   const [loading, setLoading]   = useState(true);
-  const [filterDate, setDate]   = useState(new Date().toISOString().split('T')[0]);
+  const [filterDate, setDate]   = useState(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Caracas' }));
   const [filterBanco, setBanco] = useState('Todos');
   const [search, setSearch]     = useState('');
   const [checkedRows, setCheckedRows] = useState<Set<string>>(new Set());
