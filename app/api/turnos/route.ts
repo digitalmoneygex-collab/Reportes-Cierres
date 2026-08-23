@@ -29,15 +29,20 @@ export async function GET() {
     .eq('id', user.id)
     .single();
 
-  // Buscar turno activo de este usuario
-  const { data: turnoActivo } = await supabase
+  // Buscar turno activo
+  let query = supabase
     .from('turnos')
     .select('*')
-    .eq('usuario_id', user.id)
     .is('cerrado_at', null)
     .order('abierto_at', { ascending: false })
-    .limit(1)
-    .single();
+    .limit(1);
+
+  // Si no es supervisor, solo buscar su propio turno
+  if (perfil?.rol !== 'SUPERVISOR') {
+    query = query.eq('usuario_id', user.id);
+  }
+
+  const { data: turnoActivo } = await query.maybeSingle();
 
   if (turnoActivo) {
     return NextResponse.json({ 
@@ -101,12 +106,24 @@ export async function PUT(req: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 });
 
-  const { data: turnoActivo } = await supabase
+  const { data: perfil } = await supabase
+    .from('usuarios')
+    .select('rol')
+    .eq('id', user.id)
+    .single();
+
+  let query = supabase
     .from('turnos')
     .select('*')
-    .eq('usuario_id', user.id)
     .is('cerrado_at', null)
-    .single();
+    .order('abierto_at', { ascending: false })
+    .limit(1);
+
+  if (perfil?.rol !== 'SUPERVISOR') {
+    query = query.eq('usuario_id', user.id);
+  }
+
+  const { data: turnoActivo } = await query.maybeSingle();
 
   if (!turnoActivo) return NextResponse.json({ ok: false, error: 'No hay turno activo' }, { status: 400 });
 
