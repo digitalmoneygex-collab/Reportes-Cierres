@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     const start = new Date(startStr);
     const end = endStr ? new Date(endStr) : new Date();
 
-    const [tasaResult, facturasResult, pagosResult, articulosResult, turnoResult] = await Promise.all([
+    const [tasaResult, facturasResult, pagosResult, articulosResult, turnoResult, gastosResult] = await Promise.all([
       getTasaDelDia().catch(() => 0),
       supabaseAdmin
         .from('pskloud_facturas')
@@ -37,16 +37,26 @@ export async function GET(request: Request) {
         .from('turnos')
         .select('*, usuarios(nombre_completo, cedula)')
         .eq('abierto_at', start.toISOString())
-        .maybeSingle()
+        .maybeSingle(),
+      supabaseAdmin
+        .from('otros_gastos')
+        .select('monto_bs, monto_usd')
+        .gte('created_at', start.toISOString())
+        .lte('created_at', end.toISOString())
     ]);
 
     if (facturasResult.error) throw new Error(facturasResult.error.message);
     if (pagosResult.error) throw new Error(pagosResult.error.message);
     if (articulosResult.error) throw new Error(articulosResult.error.message);
+    if (gastosResult.error) throw new Error(gastosResult.error.message);
 
     const facturas = facturasResult.data || [];
     const pagos = pagosResult.data || [];
     const articulos = articulosResult.data || [];
+    const gastos = gastosResult.data || [];
+
+    const totalGastosBs = gastos.reduce((sum, g) => sum + (Number(g.monto_bs) || 0), 0);
+    const totalGastosUsd = gastos.reduce((sum, g) => sum + (Number(g.monto_usd) || 0), 0);
     const turno = turnoResult?.data;
     
     // Extraer datos del cajero
@@ -248,6 +258,8 @@ export async function GET(request: Request) {
           devolucionesEfUsd,
           totalRecibidoBs,
           totalRecibidoUsd,
+          totalGastosBs,
+          totalGastosUsd,
           totalFacturas: facturas.length
         },
         metodosPago,

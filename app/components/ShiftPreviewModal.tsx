@@ -12,6 +12,7 @@ type PreviewData = {
     totalBs: number; totalBsUsd: number;
     devolucionesEfBs: number; devolucionesEfUsd: number;
     totalRecibidoBs: number; totalRecibidoUsd: number;
+    totalGastosBs?: number; totalGastosUsd?: number;
     totalFacturas: number;
   };
   metodosPago: { metodo: string; cantidad: number; totalBs: number }[];
@@ -261,15 +262,32 @@ export default function ShiftPreviewModal({
                       </div>
                     );
                   })}
+                  
+                  {data.pskloud.totalGastosBs && data.pskloud.totalGastosBs > 0 ? (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', borderTop: '1px solid rgba(248,113,113,0.15)', paddingTop: '4px', marginTop: '2px' }}>
+                      <span style={{ color: '#f87171' }}>📉 Otros Gastos</span>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ display: 'block', color: '#f87171', fontWeight: 'bold', fontFamily: 'monospace', fontSize: '11px' }}>
+                          - Bs. {data.pskloud.totalGastosBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                        </span>
+                        {data.pskloud.tasa > 0 && (
+                          <span style={{ display: 'block', fontSize: '9px', color: '#fca5a5' }}>
+                            - $ {data.pskloud.totalGastosUsd!.toFixed(2)} USD
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: '1px solid rgba(148,163,184,0.15)', marginTop: '2px' }}>
                     <span style={{ fontSize: '12px', color: '#818cf8', fontWeight: '800' }}>TOTAL</span>
                     <div style={{ textAlign: 'right' }}>
                       <span style={{ display: 'block', fontSize: '12px', color: '#818cf8', fontWeight: '800', fontFamily: 'monospace' }}>
-                        Bs. {data.metodosPago.reduce((a, c) => a + c.totalBs, 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                        Bs. {(data.metodosPago.reduce((a, c) => a + c.totalBs, 0) - (data.pskloud.totalGastosBs || 0)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                       </span>
                       {data.pskloud.tasa > 0 && (
                         <span style={{ display: 'block', fontSize: '10px', color: '#a5b4fc' }}>
-                          ~ $ {(data.metodosPago.reduce((a, c) => a + c.totalBs, 0) / data.pskloud.tasa).toFixed(2)} USD
+                          ~ $ {((data.metodosPago.reduce((a, c) => a + c.totalBs, 0) - (data.pskloud.totalGastosBs || 0)) / data.pskloud.tasa).toFixed(2)} USD
                         </span>
                       )}
                     </div>

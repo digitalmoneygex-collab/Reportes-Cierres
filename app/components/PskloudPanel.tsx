@@ -13,7 +13,13 @@ interface PskloudData {
     totalBs: number; totalBsUsd: number;               // Total Ingresos
     devolucionesEfBs: number; devolucionesEfUsd: number; // Devoluciones
     totalRecibidoBs: number; totalRecibidoUsd: number;  // TOTAL RECIBIDO
+    totalGastosBs?: number; totalGastosUsd?: number;
     tasa: number; totalUsd: number;
+  };
+  gastos?: {
+    items: any[];
+    totalBs: number;
+    totalUsd: number;
   };
   burguer: {
     combosHamb: ComboItem[];
@@ -229,15 +235,32 @@ export default function PskloudPanel({ data, loading }: { data: PskloudData | nu
                 </span>
               </div>
             ))}
+            
+            {data.gastos && data.gastos.totalBs > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0 4px', borderTop: '1px solid rgba(248,113,113,0.15)', marginTop: '4px' }}>
+                <span style={{ fontSize: '11px', color: '#f87171', fontWeight: '800' }}>📉 OTROS GASTOS</span>
+                <span style={{ textAlign: 'right' }}>
+                  <span style={{ display: 'block', fontSize: '12px', color: '#f87171', fontWeight: '800' }}>
+                    - {fmtBs(data.gastos.totalBs)}
+                  </span>
+                  {corteCaja?.tasa > 0 && (
+                    <span style={{ display: 'block', fontSize: '11px', color: '#fca5a5' }}>
+                      - $ {data.gastos.totalUsd.toFixed(2)} USD
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0 4px', borderTop: '1px solid rgba(148,163,184,0.15)', marginTop: '6px' }}>
               <span style={{ fontSize: '11px', color: '#818cf8', fontWeight: '800' }}>VENTAS TOTALES</span>
               <span style={{ textAlign: 'right' }}>
                 <span style={{ display: 'block', fontSize: '13px', color: '#818cf8', fontWeight: '800' }}>
-                  {fmtBs(metodosPago.reduce((acc, curr) => acc + curr.totalBs, 0))}
+                  {fmtBs(metodosPago.reduce((acc, curr) => acc + curr.totalBs, 0) - (data.gastos?.totalBs || 0))}
                 </span>
                 {corteCaja?.tasa > 0 && (
                   <span style={{ display: 'block', fontSize: '11px', color: '#a5b4fc' }}>
-                    $ {(metodosPago.reduce((acc, curr) => acc + curr.totalBs, 0) / corteCaja.tasa).toFixed(2)} USD
+                    $ {((metodosPago.reduce((acc, curr) => acc + curr.totalBs, 0) - (data.gastos?.totalBs || 0)) / corteCaja.tasa).toFixed(2)} USD
                   </span>
                 )}
               </span>

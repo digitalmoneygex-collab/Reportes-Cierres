@@ -171,7 +171,7 @@ export async function GET(request: Request) {
       end = new Date(end.getTime() - 1);
     }
 
-    const [tasaResult, facturasResult, articulosResult] = await Promise.all([
+    const [tasaResult, facturasResult, articulosResult, gastosResult] = await Promise.all([
       getTasaDelDia().catch(() => 0),
       supabaseAdmin
         .from('pskloud_facturas')
@@ -182,14 +182,24 @@ export async function GET(request: Request) {
         .from('pskloud_articulos')
         .select('*')
         .gte('fechayhora', start.toISOString())
-        .lte('fechayhora', end.toISOString())
+        .lte('fechayhora', end.toISOString()),
+      supabaseAdmin
+        .from('otros_gastos')
+        .select('*')
+        .gte('created_at', start.toISOString())
+        .lte('created_at', end.toISOString())
     ]);
 
     if (facturasResult.error) throw new Error(facturasResult.error.message);
     if (articulosResult.error) throw new Error(articulosResult.error.message);
+    if (gastosResult.error) throw new Error(gastosResult.error.message);
 
     const facturas = facturasResult.data || [];
     const articulos = articulosResult.data || [];
+    const gastos = gastosResult.data || [];
+
+    const totalGastosBs = gastos.reduce((sum, g) => sum + (Number(g.monto_bs) || 0), 0);
+    const totalGastosUsd = gastos.reduce((sum, g) => sum + (Number(g.monto_usd) || 0), 0);
 
     // ── Calcular Totales de Caja ──────────────────────────────────────────────
     let totalBs = 0;
@@ -278,8 +288,15 @@ export async function GET(request: Request) {
         devolucionesEfUsd,
         totalRecibidoBs,
         totalRecibidoUsd,
+        totalGastosBs,
+        totalGastosUsd,
         tasa,
-        totalUsd: totalRecibidoUsd,
+        totalUsd: tasa > 0 ? totalRecibidoBs / tasa : 0,
+      },
+      gastos: {
+        items: gastos,
+        totalBs: totalGastosBs,
+        totalUsd: totalGastosUsd
       },
       metodosPago,
       burguer: {
