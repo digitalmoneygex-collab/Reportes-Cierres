@@ -269,8 +269,6 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
-      </div>
-
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '28px' }}>
         <div className="card-glow" style={{ background: 'linear-gradient(135deg, #0c1428 0%, #101a2e 100%)' }}>
           <p className="label" style={{ marginBottom: '12px', color: '#475569' }}>Pagos Móviles del Día</p>
