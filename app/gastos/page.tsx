@@ -20,6 +20,7 @@ export default function GastosPage() {
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [tasa, setTasa] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [perfil, setPerfil] = useState<any>(null);
   
   // Form states
   const [descripcion, setDescripcion] = useState('');
@@ -35,8 +36,11 @@ export default function GastosPage() {
       const tRes = await fetch('/api/turnos');
       const tJson = await tRes.json();
       let qs = '';
-      if (tJson.ok && tJson.active && tJson.turno) {
-        qs = `?abierto_at=${encodeURIComponent(tJson.turno.abierto_at)}`;
+      if (tJson.ok) {
+        setPerfil(tJson.perfil);
+        if (tJson.active && tJson.turno) {
+          qs = `?abierto_at=${encodeURIComponent(tJson.turno.abierto_at)}`;
+        }
       }
 
       const res = await fetch(`/api/gastos${qs}`);
@@ -185,17 +189,17 @@ export default function GastosPage() {
                   <th>Monto Ref.</th>
                   <th>Total Bs.</th>
                   <th>Total USD</th>
-                  <th style={{ width: '50px' }}></th>
+                  {perfil?.rol === 'SUPERVISOR' && <th style={{ width: '50px' }}></th>}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>Cargando gastos...</td>
+                    <td colSpan={perfil?.rol === 'SUPERVISOR' ? 6 : 5} style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>Cargando gastos...</td>
                   </tr>
                 ) : gastos.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: '#475569' }}>No hay gastos registrados en este turno.</td>
+                    <td colSpan={perfil?.rol === 'SUPERVISOR' ? 6 : 5} style={{ textAlign: 'center', padding: '30px', color: '#475569' }}>No hay gastos registrados en este turno.</td>
                   </tr>
                 ) : (
                   gastos.map(g => (
@@ -211,16 +215,18 @@ export default function GastosPage() {
                       </td>
                       <td style={{ color: '#34d399', fontWeight: '600' }}>{fmtBs(g.monto_bs)}</td>
                       <td style={{ color: '#818cf8', fontWeight: '600' }}>{fmtUsd(g.monto_usd)}</td>
-                      <td style={{ textAlign: 'center' }}>
-                        <button 
-                          className="btn btn-ghost" 
-                          style={{ padding: '4px 8px', color: '#f87171' }} 
-                          onClick={() => handleDelete(g.id)}
-                          title="Eliminar gasto"
-                        >
-                          ✕
-                        </button>
-                      </td>
+                      {perfil?.rol === 'SUPERVISOR' && (
+                        <td style={{ textAlign: 'center' }}>
+                          <button 
+                            className="btn btn-ghost" 
+                            style={{ padding: '4px 8px', color: '#f87171' }} 
+                            onClick={() => handleDelete(g.id)}
+                            title="Eliminar gasto"
+                          >
+                            ✕
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
