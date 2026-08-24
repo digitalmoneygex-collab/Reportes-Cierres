@@ -128,8 +128,7 @@ export default function PagosPage() {
           monto_bs: Number(manualData.monto_bs),
           referencia: manualData.referencia,
           banco_origen: manualData.banco_origen,
-          telefono_emisor: manualData.telefono_emisor || '0000000000',
-          observaciones: manualData.observaciones
+          telefono_emisor: manualData.telefono_emisor || '0000000000'
         })
       });
       const json = await res.json();
@@ -343,10 +342,6 @@ export default function PagosPage() {
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '6px', color: '#94a3b8' }}>Teléfono Emisor (Opcional)</label>
                 <input type="text" value={manualData.telefono_emisor} onChange={e => setManualData({...manualData, telefono_emisor: e.target.value})} className="form-input" placeholder="Ej. 04141234567" />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '6px', color: '#94a3b8' }}>Observaciones (Opcional)</label>
-                <input type="text" value={manualData.observaciones} onChange={e => setManualData({...manualData, observaciones: e.target.value})} className="form-input" placeholder="Ej. Pago verificado por el cliente" />
               </div>
               <button type="submit" disabled={isSubmitting} className="btn" style={{ background: '#3b82f6', color: 'white', border: 'none', width: '100%', marginTop: '10px' }}>
                 {isSubmitting ? 'Guardando...' : 'Guardar Pago'}

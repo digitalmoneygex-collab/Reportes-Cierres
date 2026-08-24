@@ -107,7 +107,6 @@ export async function POST(request: Request) {
       banco_origen,
       metodo: 'pago_movil',
       telefono_emisor: telefono_emisor || '0000000000',
-      observaciones: observaciones || 'Agregado manualmente',
       procesado: true,
       es_duplicado: false
     });
