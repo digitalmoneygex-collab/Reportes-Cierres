@@ -29,18 +29,14 @@ export async function GET() {
     .eq('id', user.id)
     .single();
 
-  // Buscar turno activo
+  // Buscar turno activo del usuario actual
   let query = supabase
     .from('turnos')
     .select('*')
     .is('cerrado_at', null)
+    .eq('usuario_id', user.id)
     .order('abierto_at', { ascending: false })
     .limit(1);
-
-  // Si no es supervisor, solo buscar su propio turno
-  if (perfil?.rol !== 'SUPERVISOR') {
-    query = query.eq('usuario_id', user.id);
-  }
 
   const { data: turnoActivo } = await query.maybeSingle();
 
@@ -94,12 +90,9 @@ export async function PUT(req: Request) {
     .from('turnos')
     .select('*')
     .is('cerrado_at', null)
+    .eq('usuario_id', user.id)
     .order('abierto_at', { ascending: false })
     .limit(1);
-
-  if (perfil?.rol !== 'SUPERVISOR') {
-    query = query.eq('usuario_id', user.id);
-  }
 
   const { data: turnoActivo } = await query.maybeSingle();
 

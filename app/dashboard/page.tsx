@@ -83,12 +83,10 @@ export default function DashboardPage() {
         else setActiveTurno(null);
         setPerfil(json.perfil);
 
-        if (json.perfil?.rol === 'SUPERVISOR') {
-          const listRes = await fetch('/api/turnos/list');
-          const listJson = await listRes.json();
-          if (listJson.ok) {
-            setTurnosList(listJson.turnos);
-          }
+        const listRes = await fetch('/api/turnos/list');
+        const listJson = await listRes.json();
+        if (listJson.ok) {
+          setTurnosList(listJson.turnos);
         }
       }
     } catch { }
@@ -254,7 +252,6 @@ export default function DashboardPage() {
           <p className="eyebrow" style={{ marginBottom: '4px' }}>{fmtDate()}</p>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <h1 className="page-title" style={{ margin: 0 }}>Dashboard</h1>
-            {perfil?.rol === 'SUPERVISOR' && (
               <select 
                 style={{
                   background: '#1e293b', color: 'white', border: '1px solid #334155', borderRadius: '6px', padding: '4px 12px', fontSize: '14px', cursor: 'pointer', outline: 'none'
@@ -263,7 +260,7 @@ export default function DashboardPage() {
                 onChange={(e) => setSelectedView(e.target.value)}
               >
                 <option value="activo">Turno Actual (Activo)</option>
-                <option value="consolidado">Consolidado del Día</option>
+                {perfil?.rol === 'SUPERVISOR' && <option value="consolidado">Consolidado del Día</option>}
                 {turnosList.filter(t => t.cerrado_at).map(t => {
                   const d = new Date(t.abierto_at);
                   const dia = String(d.getDate()).padStart(2, '0');
@@ -276,7 +273,6 @@ export default function DashboardPage() {
                   );
                 })}
               </select>
-            )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '10px', flexWrap: 'wrap' }}>
             <p className="page-subtitle" style={{ margin: 0 }}>
