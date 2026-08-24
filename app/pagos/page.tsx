@@ -16,7 +16,35 @@ type Pago = {
   auditoria_check?: boolean;
 };
 
-const BANCOS = ['Todos', 'Mercantil', 'Banesco', 'Banco de Venezuela', 'Daviplata', 'Nequi', 'Bancolombia', 'Banco de Bogotá'];
+const BANCOS = [
+  'Todos',
+  '0156 - 100% Banco',
+  '0172 - Bancamiga',
+  '0114 - Bancaribe',
+  '0171 - Banco Activo',
+  '0166 - Banco Agrícola de Venezuela',
+  '0128 - Banco Caroní',
+  '0102 - Banco de Venezuela (BDV)',
+  '0163 - Banco del Tesoro',
+  '0175 - Banco Digital de los Trabajadores (Bicentenario)',
+  '0115 - Banco Exterior',
+  '0151 - Banco Fondo Común (BFC)',
+  '0173 - Banco Internacional de Desarrollo',
+  '0191 - Banco Nacional de Crédito (BNC)',
+  '0138 - Banco Plaza',
+  '0137 - Banco Sofitasa',
+  '0134 - Banesco',
+  '0177 - BANFANB',
+  '0146 - Bangente',
+  '0174 - Banplus',
+  '0168 - Bancrecer',
+  '0108 - BBVA Provincial',
+  '0157 - DelSur',
+  '0105 - Mercantil Banco',
+  '0169 - Mi Banco',
+  '0178 - N58 Banco Digital',
+  '0104 - Venezolano de Crédito'
+];
 
 const fmtBs = (v: number) =>
   new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'VES', maximumFractionDigits: 2 }).format(v ?? 0);
