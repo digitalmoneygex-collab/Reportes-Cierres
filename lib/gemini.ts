@@ -48,17 +48,29 @@ export async function readPaymentReceipt(base64Image: string | null, textContent
       const errMsg = error.message || '';
       console.error(`Gemini API Error: ${errMsg}`);
       
-      // If it's a Rate Limit (429), do not retry immediately, throw to let the caller handle it.
-      if (errMsg.includes('429') || errMsg.includes('Too Many Requests') || errMsg.includes('Quota exceeded')) {
-        throw new Error(`[RATE_LIMIT] Límite gratuito de Gemini alcanzado (15 por minuto). Espera 1 minuto y vuelve a intentarlo.`);
-      }
+      // If it's a Rate Limit (429), wait 15 seconds and try again. 
+      // If it's exhausted, it will fail on the last retry.
+      const isRateLimit = errMsg.includes('429') || errMsg.includes('Too Many Requests') || errMsg.includes('Quota exceeded');
+      const isOverloaded = errMsg.includes('503') || errMsg.includes('Service Unavailable') || errMsg.includes('overloaded');
 
       retries--;
       if (retries === 0) {
+        if (isRateLimit) {
+          throw new Error(`[RATE_LIMIT] Límite gratuito de Gemini alcanzado (15 por minuto). Espera 1 minuto y vuelve a intentarlo.`);
+        }
         throw new Error(`Error en OCR después de 3 intentos: ${errMsg}`);
       }
-      // Wait 2 seconds before retrying
-      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Wait before retrying
+      if (isRateLimit) {
+        console.log('[RATE LIMIT] Waiting 15s before retry...');
+        await new Promise(resolve => setTimeout(resolve, 15000));
+      } else if (isOverloaded) {
+        console.log('[503 OVERLOADED] Waiting 5s before retry...');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
     }
   }
 

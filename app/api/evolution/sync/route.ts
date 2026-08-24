@@ -160,10 +160,10 @@ export async function POST(request: Request) {
         }
       }
 
-      // Add a small delay between requests (4 seconds) to avoid Gemini rate limit (15 RPM)
+      // Add a small delay between requests (6 seconds) to avoid Gemini rate limit (15 RPM)
       // Only delay if it's not the first item
       if (i > 0) {
-        await new Promise(resolve => setTimeout(resolve, 4000));
+        await new Promise(resolve => setTimeout(resolve, 6000));
       }
 
       // OCR o extracción
