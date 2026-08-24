@@ -147,6 +147,21 @@ export default function PagosPage() {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    if (!confirm('¿Estás seguro de que deseas eliminar este pago? Esta acción no se puede deshacer.')) return;
+    try {
+      const res = await fetch(`/api/pagos?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setPagos(pagos => pagos.filter(p => p.id !== id));
+      } else {
+        const json = await res.json();
+        alert(json.error || 'Error al eliminar');
+      }
+    } catch {
+      alert('Error de red');
+    }
+  };
+
   return (
     <div className="animate-fade-in">
       {/* Header */}
@@ -247,12 +262,13 @@ export default function PagosPage() {
                   <th>Monto Bs.S</th>
                   <th>Método</th>
                   <th>Estado</th>
+                  {perfil?.rol === 'SUPERVISOR' && <th>Acciones</th>}
                 </tr>
               </thead>
               <tbody>
                 {pagos.length === 0 ? (
                   <tr>
-                    <td colSpan={8} style={{ textAlign: 'center', padding: '56px', color: '#475569' }}>
+                    <td colSpan={perfil?.rol === 'SUPERVISOR' ? 9 : 8} style={{ textAlign: 'center', padding: '56px', color: '#475569' }}>
                       <div style={{ fontSize: '32px', marginBottom: '10px' }}>🔍</div>
                       Sin registros para los filtros seleccionados
                     </td>
@@ -302,6 +318,18 @@ export default function PagosPage() {
                             {p.procesado ? '✓ OK' : '⏳ Pendiente'}
                           </span>
                         </td>
+                        {perfil?.rol === 'SUPERVISOR' && (
+                          <td style={{ textAlign: 'center' }}>
+                            <button 
+                              className="btn btn-ghost btn-sm" 
+                              style={{ color: '#ef4444', padding: '4px 8px' }} 
+                              onClick={() => handleDelete(p.id)}
+                              title="Eliminar pago"
+                            >
+                              🗑️
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     );
                   })

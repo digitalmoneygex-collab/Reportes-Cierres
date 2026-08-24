@@ -148,3 +148,28 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }
+
+// DELETE /api/pagos
+// URL query: ?id=string
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ ok: false, error: 'Falta ID' }, { status: 400 });
+    }
+
+    const { error } = await supabaseAdmin
+      .from('pagos_whatsapp')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw new Error(error.message);
+
+    return NextResponse.json({ ok: true });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Error desconocido';
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
+}
