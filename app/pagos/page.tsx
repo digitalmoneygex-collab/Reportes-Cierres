@@ -37,7 +37,17 @@ export default function PagosPage() {
   const [filterBanco, setBanco] = useState('Todos');
   const [search, setSearch]     = useState('');
   const [checkedRows, setCheckedRows] = useState<Set<string>>(new Set());
+  
+  const [perfil, setPerfil] = useState<any>(null);
+  const [manualModal, setManualModal] = useState(false);
+  const [manualData, setManualData] = useState({ monto_bs: '', referencia: '', banco_origen: '', telefono_emisor: '', observaciones: '' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
+  useEffect(() => {
+    fetch('/api/turnos').then(r => r.json()).then(j => {
+      if (j.ok) setPerfil(j.perfil);
+    });
+  }, []);
   const loadTasa = useCallback(async () => {
     try {
       const res = await fetch('/api/tasa', { cache: 'no-store' });
@@ -104,6 +114,38 @@ export default function PagosPage() {
     const a    = document.createElement('a');
     a.href = url; a.download = `pagos-${filterDate}.csv`; a.click();
     URL.revokeObjectURL(url);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleManualSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const res = await fetch('/api/pagos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          monto_bs: Number(manualData.monto_bs),
+          referencia: manualData.referencia,
+          banco_origen: manualData.banco_origen,
+          telefono_emisor: manualData.telefono_emisor || '0000000000',
+          observaciones: manualData.observaciones
+        })
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setManualModal(false);
+        setManualData({ monto_bs: '', referencia: '', banco_origen: '', telefono_emisor: '', observaciones: '' });
+        loadPagos();
+      } else {
+        alert(json.error || 'Error al guardar el pago');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Error en el servidor');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -115,15 +157,24 @@ export default function PagosPage() {
           <h1 className="page-title">Pagos capturados</h1>
           <p className="page-subtitle">Registros de WhatsApp en Supabase</p>
         </div>
-        <button id="pagos-export" onClick={exportCSV} className="btn btn-ghost">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-          Exportar CSV
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          {perfil?.rol === 'SUPERVISOR' && (
+            <button onClick={() => setManualModal(true)} className="btn btn-sm" style={{ background: '#3b82f6', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Agregar Pago Manual
+            </button>
+          )}
+          <button id="pagos-export" onClick={exportCSV} className="btn btn-ghost btn-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Exportar CSV
+          </button>
+        </div>
       </div>
+
 
       {/* Filters */}
       <div className="card" style={{ marginBottom: '20px' }}>
@@ -261,6 +312,49 @@ export default function PagosPage() {
           </div>
         )}
       </div>
+
+      {/* Modal Agregar Pago Manual */}
+      {manualModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(4px)' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '400px', padding: '24px', position: 'relative' }}>
+            <button 
+              onClick={() => setManualModal(false)}
+              style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '20px' }}>Agregar Pago Manual</h3>
+            <form onSubmit={handleManualSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '6px', color: '#94a3b8' }}>Monto (Bs.S) *</label>
+                <input type="number" step="0.01" required value={manualData.monto_bs} onChange={e => setManualData({...manualData, monto_bs: e.target.value})} className="form-input" placeholder="Ej. 150.00" />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '6px', color: '#94a3b8' }}>Referencia *</label>
+                <input type="text" required value={manualData.referencia} onChange={e => setManualData({...manualData, referencia: e.target.value})} className="form-input" placeholder="Nro de referencia" />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '6px', color: '#94a3b8' }}>Banco Origen *</label>
+                <select required value={manualData.banco_origen} onChange={e => setManualData({...manualData, banco_origen: e.target.value})} className="form-input">
+                  <option value="">Selecciona un banco...</option>
+                  {BANCOS.filter(b => b !== 'Todos').map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '6px', color: '#94a3b8' }}>Teléfono Emisor (Opcional)</label>
+                <input type="text" value={manualData.telefono_emisor} onChange={e => setManualData({...manualData, telefono_emisor: e.target.value})} className="form-input" placeholder="Ej. 04141234567" />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '6px', color: '#94a3b8' }}>Observaciones (Opcional)</label>
+                <input type="text" value={manualData.observaciones} onChange={e => setManualData({...manualData, observaciones: e.target.value})} className="form-input" placeholder="Ej. Pago verificado por el cliente" />
+              </div>
+              <button type="submit" disabled={isSubmitting} className="btn" style={{ background: '#3b82f6', color: 'white', border: 'none', width: '100%', marginTop: '10px' }}>
+                {isSubmitting ? 'Guardando...' : 'Guardar Pago'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

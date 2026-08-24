@@ -91,6 +91,38 @@ export async function GET(request: Request) {
   }
 }
 
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { monto_bs, referencia, banco_origen, telefono_emisor, observaciones } = body;
+
+    if (!monto_bs || !referencia || !banco_origen) {
+      return NextResponse.json({ ok: false, error: 'Faltan campos obligatorios' }, { status: 400 });
+    }
+
+    const { error: insertErr } = await supabaseAdmin.from('pagos_whatsapp').insert({
+      message_id: 'MANUAL-' + Date.now(),
+      monto_bs,
+      referencia,
+      banco_origen,
+      metodo: 'pago_movil',
+      telefono_emisor: telefono_emisor || '0000000000',
+      observaciones: observaciones || 'Agregado manualmente',
+      procesado: true,
+      es_duplicado: false
+    });
+
+    if (insertErr) {
+      return NextResponse.json({ ok: false, error: insertErr.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, message: 'Pago registrado' });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Error desconocido';
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
+}
+
 // PATCH /api/pagos
 // Body: { id: string, auditoria_check: boolean }
 export async function PATCH(request: Request) {
