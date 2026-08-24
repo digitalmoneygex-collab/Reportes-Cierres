@@ -78,8 +78,7 @@ export async function POST(request: Request) {
         moneda,
         monto_bs: Number(monto_bs.toFixed(2)),
         monto_usd: Number(monto_usd.toFixed(2)),
-        tasa_aplicada: tasa,
-        turno_id: turno_id || null
+        tasa_aplicada: tasa
       })
       .select()
       .single();
