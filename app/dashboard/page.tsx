@@ -19,6 +19,7 @@ export default function DashboardPage() {
   const [turnosList, setTurnosList] = useState<Turno[]>([]);
   const [selectedView, setSelectedView] = useState<string>('activo'); // 'activo', 'consolidado', o ID
   const [perfil, setPerfil] = useState<any>(null);
+  const [isBlocked, setIsBlocked] = useState(false);
   const [loadingTurno, setLoadingTurno] = useState(true);
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [waInst, setWaInst] = useState<WaInstance | null>(null);
@@ -82,6 +83,7 @@ export default function DashboardPage() {
         if (json.active) setActiveTurno(json.turno);
         else setActiveTurno(null);
         setPerfil(json.perfil);
+        setIsBlocked(json.blockedBySupervisor === true);
 
         const listRes = await fetch('/api/turnos/list');
         const listJson = await listRes.json();
@@ -212,11 +214,22 @@ export default function DashboardPage() {
     return <div style={{ padding: 40, color: '#e8edf5' }}>Cargando turno...</div>;
   }
 
+  if (isBlocked) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '80vh' }}>
+        <h2 style={{ color: '#ef4444', fontSize: '28px', marginBottom: '12px', fontWeight: '800' }}>Sistema Bloqueado</h2>
+        <p style={{ color: '#94a3b8', marginBottom: '24px', fontSize: '16px', textAlign: 'center', maxWidth: '400px' }}>
+          Hay un turno de Supervisor activo. Por medidas de seguridad, el sistema de cajas está bloqueado temporalmente. Espere a que el supervisor cierre su turno.
+        </p>
+      </div>
+    );
+  }
+
   if (!activeTurno && !selectedDate && selectedView === 'activo') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '80vh' }}>
-        <h2 style={{ color: '#e8edf5', fontSize: '24px', marginBottom: '8px' }}>No tienes un turno activo</h2>
-        <p style={{ color: '#94a3b8', marginBottom: '24px' }}>Abre tu turno para comenzar a registrar las ventas del sistema.</p>
+        <h2 style={{ color: '#e8edf5', fontSize: '24px', marginBottom: '8px' }}>No hay un turno activo</h2>
+        <p style={{ color: '#94a3b8', marginBottom: '24px' }}>Abre el turno para comenzar a registrar las ventas del sistema.</p>
         <button className="btn btn-primary" style={{ padding: '12px 24px', fontSize: '16px' }} onClick={openTurno}>
           Abrir Turno
         </button>

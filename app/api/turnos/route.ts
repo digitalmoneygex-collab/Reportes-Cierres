@@ -29,18 +29,27 @@ export async function GET() {
     .eq('id', user.id)
     .single();
 
-  // Buscar turno activo del usuario actual
+  // Buscar turno activo global
   let query = supabase
     .from('turnos')
-    .select('*')
+    .select('*, usuario:usuarios(rol)')
     .is('cerrado_at', null)
-    .eq('usuario_id', user.id)
     .order('abierto_at', { ascending: false })
     .limit(1);
 
   const { data: turnoActivo } = await query.maybeSingle();
 
   if (turnoActivo) {
+    // Si el turno lo abrió un SUPERVISOR y el usuario logueado NO lo es, queda bloqueado.
+    if (perfil?.rol !== 'SUPERVISOR' && turnoActivo.usuario?.rol === 'SUPERVISOR') {
+      return NextResponse.json({ 
+        ok: true, 
+        active: false, 
+        blockedBySupervisor: true, 
+        perfil 
+      });
+    }
+
     return NextResponse.json({ 
       ok: true, 
       active: true, 
@@ -49,7 +58,7 @@ export async function GET() {
     });
   }
 
-  return NextResponse.json({ ok: true, active: false, perfil });
+  return NextResponse.json({ ok: true, active: false, blockedBySupervisor: false, perfil });
 }
 
 export async function POST(req: Request) {
@@ -88,15 +97,19 @@ export async function PUT(req: Request) {
 
   let query = supabase
     .from('turnos')
-    .select('*')
+    .select('*, usuario:usuarios(rol)')
     .is('cerrado_at', null)
-    .eq('usuario_id', user.id)
     .order('abierto_at', { ascending: false })
     .limit(1);
 
   const { data: turnoActivo } = await query.maybeSingle();
 
   if (!turnoActivo) return NextResponse.json({ ok: false, error: 'No hay turno activo' }, { status: 400 });
+
+  // Seguridad: Un cajero no puede cerrar el turno de un supervisor
+  if (perfil?.rol !== 'SUPERVISOR' && turnoActivo.usuario?.rol === 'SUPERVISOR') {
+    return NextResponse.json({ ok: false, error: 'No tienes permiso para cerrar el turno de un supervisor' }, { status: 403 });
+  }
 
   // Update cerrado_at
   const { error } = await supabase
