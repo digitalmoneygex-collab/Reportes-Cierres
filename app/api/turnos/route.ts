@@ -66,9 +66,43 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 });
 
-  // Ya no heredamos la hora del turno anterior. 
-  // El turno inicia exactamente en el momento en que se le da a "Abrir Turno".
+  let body: any = {};
+  try { body = await req.json(); } catch(e){}
+  const { hora_inicio } = body;
+
   let abierto_at = new Date();
+
+  if (hora_inicio) {
+    const now = new Date();
+    const vzDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Caracas' }));
+    const [h, m] = hora_inicio.split(':').map(Number);
+    
+    const y = vzDate.getFullYear();
+    const mo = String(vzDate.getMonth() + 1).padStart(2, '0');
+    const d = String(vzDate.getDate()).padStart(2, '0');
+    
+    const isoString = `${y}-${mo}-${d}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00.000-04:00`;
+    let requestedStart = new Date(isoString);
+
+    if (requestedStart < new Date()) {
+       // Verificar que las facturas desde requestedStart en adelante no estén contabilizadas
+       const { data: facturasProcessed } = await supabase
+         .from('pskloud_facturas')
+         .select('fechayhora')
+         .eq('procesado', true)
+         .gte('fechayhora', requestedStart.toISOString())
+         .order('fechayhora', { ascending: false })
+         .limit(1);
+
+       if (facturasProcessed && facturasProcessed.length > 0) {
+         // Si hay facturas procesadas, adelantamos la hora justo después de la última procesada
+         // para atrapar solo las "huérfanas" posteriores
+         const lastProcessedTime = new Date(facturasProcessed[0].fechayhora);
+         requestedStart = new Date(lastProcessedTime.getTime() + 1000);
+       }
+       abierto_at = requestedStart;
+    }
+  }
 
   // Crear el turno
   const { data: newTurno, error } = await supabase

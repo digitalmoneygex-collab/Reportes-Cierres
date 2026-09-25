@@ -95,12 +95,21 @@ export default function DashboardPage() {
     setLoadingTurno(false);
   }, []);
 
+  const [horaInicioOverride, setHoraInicioOverride] = useState('');
+
   const openTurno = async () => {
     try {
-      const res = await fetch('/api/turnos', { method: 'POST' });
+      const payload = horaInicioOverride ? { hora_inicio: horaInicioOverride } : {};
+      const res = await fetch('/api/turnos', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload) 
+      });
       const json = await res.json();
       if (json.ok && json.turno) {
         setActiveTurno(json.turno);
+      } else {
+        alert(json.error || 'Error abriendo turno');
       }
     } catch (e) {
       alert('Error abriendo turno');
@@ -230,6 +239,18 @@ export default function DashboardPage() {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '80vh' }}>
         <h2 style={{ color: '#e8edf5', fontSize: '24px', marginBottom: '8px' }}>No hay un turno activo</h2>
         <p style={{ color: '#94a3b8', marginBottom: '24px' }}>Abre el turno para comenzar a registrar las ventas del sistema.</p>
+        
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', alignItems: 'center', background: 'rgba(30,41,59,0.5)', padding: '12px 20px', borderRadius: '12px', border: '1px solid rgba(148,163,184,0.1)' }}>
+           <label style={{color: '#94a3b8', fontSize: '14px', fontWeight: '500'}}>Hora tentativa de inicio (Opcional):</label>
+           <input 
+             type="time" 
+             value={horaInicioOverride} 
+             onChange={e => setHoraInicioOverride(e.target.value)} 
+             style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #334155', background: '#0f172a', color: 'white', outline: 'none' }} 
+             title="Si facturaste antes de abrir la caja, coloca aquí la hora en la que empezaste a facturar."
+           />
+        </div>
+
         <button className="btn btn-primary" style={{ padding: '12px 24px', fontSize: '16px' }} onClick={openTurno}>
           Abrir Turno
         </button>
