@@ -371,17 +371,20 @@ async function sync() {
          const articulosPayload = Object.values(payloadMap);
          
          // 1. Borrar todos los articulos de hoy para evitar filas huerfanas (facturas eliminadas en PSKloud)
-         await supabase.from('pskloud_articulos').delete().eq('fecha', today);
+         const { error: delError } = await supabase.from('pskloud_articulos').delete().eq('fecha', today);
+         if (delError) {
+           console.error(`  ERROR al borrar articulos de hoy: ${delError.message}`);
+         }
 
          // 2. Insertar frescos
          const { error: artError } = await supabase
            .from('pskloud_articulos')
-           .insert(articulosPayload);
+           .upsert(articulosPayload, { onConflict: 'documento,nombre' });
            
          if (artError) {
            console.error(`  ERROR al subir articulos: ${artError.message}`);
          } else {
-           console.log(`  OK ${articulosRaw.length} articulos subidos a pskloud_articulos`);
+           console.log(`  OK ${articulosRaw.length} articulos subidos a pskloud_articulos (agrupados en ${articulosPayload.length})`);
          }
       }
 
