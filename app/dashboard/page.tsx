@@ -32,6 +32,8 @@ export default function DashboardPage() {
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [previewOpen, setPreviewOpen] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isEditingTime, setIsEditingTime] = useState(false);
+  const [editHoraInicio, setEditHoraInicio] = useState('');
   const prevIdsRef = useRef<Set<string>>(new Set());
 
   const handleDownloadPdf = async () => {
@@ -113,6 +115,30 @@ export default function DashboardPage() {
       }
     } catch (e) {
       alert('Error abriendo turno');
+    }
+  };
+
+  const updateTurnoTime = async () => {
+    if (!editHoraInicio) return;
+    try {
+      const res = await fetch('/api/turnos', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hora_inicio: editHoraInicio })
+      });
+      const json = await res.json();
+      if (json.ok && json.abierto_at) {
+        setActiveTurno(prev => prev ? { ...prev, abierto_at: json.abierto_at } : null);
+        setIsEditingTime(false);
+        setEditHoraInicio('');
+        // Forzar recarga de datos
+        loadPagos(selectedDate, { ...effectiveTurno, abierto_at: json.abierto_at } as Turno);
+        loadPskloud(selectedDate, { ...effectiveTurno, abierto_at: json.abierto_at } as Turno);
+      } else {
+        alert(json.error || 'Error actualizando la hora');
+      }
+    } catch (e) {
+      alert('Error actualizando la hora');
     }
   };
 
@@ -309,15 +335,43 @@ export default function DashboardPage() {
               </select>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '10px', flexWrap: 'wrap' }}>
-            <p className="page-subtitle" style={{ margin: 0 }}>
-              {selectedView === 'activo' && activeTurno 
-                ? `Turno Abierto desde: ${new Date(activeTurno.abierto_at).toLocaleTimeString('es-VE')}`
-                : selectedView === 'consolidado' 
-                ? 'Consolidado del Día' 
-                : effectiveTurno?.cerrado_at 
-                ? `Turno Cerrado (${new Date(effectiveTurno.abierto_at).toLocaleTimeString('es-VE')} - ${new Date(effectiveTurno.cerrado_at).toLocaleTimeString('es-VE')})`
-                : 'Sin Turno Activo'}
-            </p>
+            <div className="page-subtitle" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {selectedView === 'activo' && activeTurno ? (
+                isEditingTime ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>Turno Abierto desde:</span>
+                    <input 
+                      type="time" 
+                      value={editHoraInicio} 
+                      onChange={(e) => setEditHoraInicio(e.target.value)}
+                      style={{ background: '#1e293b', color: 'white', border: '1px solid #334155', borderRadius: '4px', padding: '2px 6px', fontSize: '13px', outline: 'none' }}
+                    />
+                    <button className="btn btn-primary btn-sm" style={{ padding: '2px 8px', fontSize: '12px', height: '24px', minHeight: '24px' }} onClick={updateTurnoTime}>Guardar</button>
+                    <button className="btn btn-ghost btn-sm" style={{ padding: '2px 8px', fontSize: '12px', height: '24px', minHeight: '24px' }} onClick={() => setIsEditingTime(false)}>Cancelar</button>
+                  </div>
+                ) : (
+                  <>
+                    <span>Turno Abierto desde: {new Date(activeTurno.abierto_at).toLocaleTimeString('es-VE')}</span>
+                    <button 
+                      onClick={() => {
+                        const d = new Date(activeTurno.abierto_at);
+                        setEditHoraInicio(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
+                        setIsEditingTime(true);
+                      }}
+                      style={{ background: 'transparent', border: 'none', color: '#6366f1', cursor: 'pointer', fontSize: '12px', textDecoration: 'underline' }}
+                    >
+                      Ajustar hora
+                    </button>
+                  </>
+                )
+              ) : selectedView === 'consolidado' ? (
+                'Consolidado del Día'
+              ) : effectiveTurno?.cerrado_at ? (
+                `Turno Cerrado (${new Date(effectiveTurno.abierto_at).toLocaleTimeString('es-VE')} - ${new Date(effectiveTurno.cerrado_at).toLocaleTimeString('es-VE')})`
+              ) : (
+                'Sin Turno Activo'
+              )}
+            </div>
             {tasa > 0 && (
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'linear-gradient(135deg, rgba(251,191,36,0.15) 0%, rgba(245,158,11,0.1) 100%)',
