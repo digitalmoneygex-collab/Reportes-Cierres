@@ -157,3 +157,71 @@ export async function PUT(req: Request) {
   
   return NextResponse.json({ ok: true });
 }
+
+export async function PATCH(req: Request) {
+  const supabase = await getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 });
+
+  let body: any = {};
+  try { body = await req.json(); } catch(e){}
+  const { hora_inicio } = body;
+
+  if (!hora_inicio) {
+    return NextResponse.json({ ok: false, error: 'hora_inicio es requerida' }, { status: 400 });
+  }
+
+  // Buscar turno activo global
+  let query = supabase
+    .from('turnos')
+    .select('*')
+    .is('cerrado_at', null)
+    .order('abierto_at', { ascending: false })
+    .limit(1);
+
+  const { data: turnoActivo } = await query.maybeSingle();
+
+  if (!turnoActivo) return NextResponse.json({ ok: false, error: 'No hay turno activo' }, { status: 400 });
+
+  const now = new Date();
+  const vzDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Caracas' }));
+  const [h, m] = hora_inicio.split(':').map(Number);
+  
+  const y = vzDate.getFullYear();
+  const mo = String(vzDate.getMonth() + 1).padStart(2, '0');
+  const d = String(vzDate.getDate()).padStart(2, '0');
+  
+  const isoString = `${y}-${mo}-${d}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00.000-04:00`;
+  let requestedStart = new Date(isoString);
+
+  if (requestedStart > new Date()) {
+     requestedStart = new Date();
+  }
+
+  // Verificar que las facturas desde requestedStart en adelante no estén contabilizadas
+  const { data: facturasProcessed } = await supabase
+     .from('pskloud_facturas')
+     .select('fechayhora')
+     .eq('procesado', true)
+     .gte('fechayhora', requestedStart.toISOString())
+     .lte('fechayhora', turnoActivo.abierto_at)
+     .order('fechayhora', { ascending: false })
+     .limit(1);
+
+  if (facturasProcessed && facturasProcessed.length > 0) {
+     const lastProcessedTime = new Date(facturasProcessed[0].fechayhora);
+     requestedStart = new Date(lastProcessedTime.getTime() + 1000);
+  }
+
+  // Update
+  const { error } = await supabase
+    .from('turnos')
+    .update({ 
+      abierto_at: requestedStart.toISOString()
+    })
+    .eq('id', turnoActivo.id);
+
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  
+  return NextResponse.json({ ok: true, abierto_at: requestedStart.toISOString() });
+}
