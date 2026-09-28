@@ -34,6 +34,12 @@ export default function DashboardPage() {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isEditingTime, setIsEditingTime] = useState(false);
   const [editHoraInicio, setEditHoraInicio] = useState('');
+  
+  // Ceder turno states
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [usuariosList, setUsuariosList] = useState<any[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  
   const prevIdsRef = useRef<Set<string>>(new Set());
 
   const handleDownloadPdf = async () => {
@@ -159,6 +165,40 @@ export default function DashboardPage() {
       }
     } catch (e) {
       alert('Error de red al cerrar turno');
+    }
+  };
+
+  const openTransferModal = async () => {
+    try {
+      const res = await fetch('/api/usuarios');
+      const json = await res.json();
+      if (json.ok && json.usuarios) {
+        setUsuariosList(json.usuarios.filter((u: any) => u.rol === 'CAJERO'));
+        setTransferModalOpen(true);
+      }
+    } catch (e) {
+      alert('Error cargando cajeros');
+    }
+  };
+
+  const cederTurno = async () => {
+    if (!selectedUserId) return alert('Selecciona un cajero');
+    try {
+      const res = await fetch('/api/turnos/ceder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nuevo_usuario_id: selectedUserId })
+      });
+      const json = await res.json();
+      if (json.ok) {
+        alert('Turno cedido exitosamente. Refresca la página o avisa al cajero.');
+        setTransferModalOpen(false);
+        loadTurno();
+      } else {
+        alert(json.error || 'Error al ceder el turno');
+      }
+    } catch (e) {
+      alert('Error de red al ceder el turno');
     }
   };
 
@@ -299,6 +339,30 @@ export default function DashboardPage() {
 
   return (
     <div className="animate-fade-in">
+      {transferModalOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#1e293b', padding: '24px', borderRadius: '12px', maxWidth: '400px', width: '100%', border: '1px solid #334155' }}>
+            <h2 style={{ fontSize: '20px', color: '#e8edf5', marginBottom: '16px' }}>Ceder Turno Activo</h2>
+            <p style={{ color: '#94a3b8', fontSize: '14px', marginBottom: '16px' }}>
+              El cajero seleccionado heredará toda la información y facturas desde la apertura de este turno.
+            </p>
+            <select 
+              style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #334155', background: '#0f172a', color: 'white', outline: 'none', marginBottom: '24px' }}
+              value={selectedUserId}
+              onChange={e => setSelectedUserId(e.target.value)}
+            >
+              <option value="">Selecciona un cajero...</option>
+              {usuariosList.map(u => (
+                <option key={u.id} value={u.id}>{u.nombre_completo}</option>
+              ))}
+            </select>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button className="btn btn-ghost" onClick={() => setTransferModalOpen(false)}>Cancelar</button>
+              <button className="btn btn-primary" style={{ background: '#f59e0b' }} onClick={cederTurno}>Transferir Turno</button>
+            </div>
+          </div>
+        </div>
+      )}
       {activeTurno && (
         <ShiftPreviewModal 
           isOpen={previewOpen} 
@@ -396,9 +460,16 @@ export default function DashboardPage() {
           }}>Refrescar</button>
 
           {selectedView === 'activo' && activeTurno && (
-            <button className="btn btn-sm" style={{ background: '#ef4444', color: 'white', border: 'none' }} onClick={() => setPreviewOpen(true)}>
-              Cerrar Turno
-            </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {perfil?.rol === 'SUPERVISOR' && activeTurno.usuario_id === perfil.id && (
+                <button className="btn btn-sm" style={{ background: '#f59e0b', color: 'white', border: 'none' }} onClick={openTransferModal}>
+                  Ceder Turno
+                </button>
+              )}
+              <button className="btn btn-sm" style={{ background: '#ef4444', color: 'white', border: 'none' }} onClick={() => setPreviewOpen(true)}>
+                Cerrar Turno
+              </button>
+            </div>
           )}
 
           {(selectedView !== 'activo' || !activeTurno) && (
