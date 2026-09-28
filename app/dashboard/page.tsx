@@ -461,7 +461,7 @@ export default function DashboardPage() {
 
           {selectedView === 'activo' && activeTurno && (
             <div style={{ display: 'flex', gap: '8px' }}>
-              {perfil?.rol === 'SUPERVISOR' && activeTurno.usuario_id === perfil.id && (
+              {perfil?.rol === 'SUPERVISOR' && (
                 <button className="btn btn-sm" style={{ background: '#f59e0b', color: 'white', border: 'none' }} onClick={openTransferModal}>
                   Ceder Turno
                 </button>
