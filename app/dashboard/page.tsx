@@ -661,7 +661,9 @@ export default function DashboardPage() {
             </button>
           )}
           
-          <button className="btn btn-ghost btn-sm" style={{ border: '1px solid rgba(99,102,241,0.3)', color: '#a5b4fc', background: 'rgba(99,102,241,0.1)' }} onClick={() => setCalcOpen(true)}>
+          <button className="btn btn-ghost btn-sm" style={{ border: '1px solid rgba(99,102,241,0.3)', color: '#a5b4fc', background: 'rgba(99,102,241,0.1)' }} onClick={() => {
+            window.open('/calculadora', 'CalculadoraVuelto', 'width=420,height=700,left=100,top=100,menubar=no,toolbar=no,location=no,status=no');
+          }}>
             🧮 Calculadora
           </button>
           <button className="btn btn-ghost btn-sm" disabled={isRefreshing} onClick={async () => {
