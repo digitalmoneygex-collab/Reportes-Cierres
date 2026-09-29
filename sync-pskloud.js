@@ -328,7 +328,7 @@ async function sync() {
       const selectDocArt = colDoc ? `m.\`${colDoc}\`` : `m.documento`;
       
       const [articulosRaw] = await conn.query(
-        `SELECT m.documento, c.fechayhora, m.grupo, m.nombre, m.cantidad
+        `SELECT m.documento, c.fechayhora, m.grupo, m.nombre, m.cantidad, m.preciofin, m.montototal
          FROM opermv m
          LEFT JOIN operclit c ON TRIM(m.documento) = TRIM(${selectJoinDoc})
          WHERE DATE(m.fechadoc) = ?
@@ -339,6 +339,8 @@ async function sync() {
       
       if (articulosRaw.length > 0) {
          const payloadMap = {};
+         const detallesMap = {};
+
          for (const r of articulosRaw) {
            let cat = 'otros';
            const g = String(r.grupo).trim();
@@ -366,6 +368,15 @@ async function sync() {
              };
            }
            payloadMap[key].cantidad += Number(r.cantidad) || 0;
+
+           // Para el archivo JSON de detalles
+           if (!detallesMap[doc]) detallesMap[doc] = [];
+           detallesMap[doc].push({
+             nombre: String(r.nombre).trim(),
+             cantidad: Number(r.cantidad) || 0,
+             precio: Number(r.preciofin) || 0,
+             total: Number(r.montototal) || 0
+           });
          }
          
          const articulosPayload = Object.values(payloadMap);
@@ -385,6 +396,21 @@ async function sync() {
            console.error(`  ERROR al subir articulos: ${artError.message}`);
          } else {
            console.log(`  OK ${articulosRaw.length} articulos subidos a pskloud_articulos (agrupados en ${articulosPayload.length})`);
+         }
+
+         // 3. Subir el archivo de detalles JSON al Storage
+         const jsonBuffer = Buffer.from(JSON.stringify(detallesMap), 'utf-8');
+         const { error: storageError } = await supabase.storage
+           .from('detalles')
+           .upload(`${today}.json`, jsonBuffer, {
+              contentType: 'application/json',
+              upsert: true
+           });
+           
+         if (storageError) {
+           console.error(`  ERROR al subir detalles JSON: ${storageError.message}`);
+         } else {
+           console.log(`  OK Archivo JSON de detalles subido para ${today}`);
          }
       }
 

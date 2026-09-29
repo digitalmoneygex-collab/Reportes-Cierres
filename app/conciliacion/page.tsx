@@ -101,7 +101,7 @@ export default function ConciliacionPage() {
     setDetailLoading(true);
     setDetailModalOpen(true);
     try {
-      const res = await fetch(`/api/pskloud/detalles?documento=${encodeURIComponent(f.documento)}`);
+      const res = await fetch(`/api/pskloud/detalles?documento=${encodeURIComponent(f.documento)}&fecha=${encodeURIComponent(f.fecha)}`);
       const json = await res.json();
       if (json.ok) {
         setDetailItems(json.detalles);
