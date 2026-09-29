@@ -387,7 +387,7 @@ export default function ConciliacionPage() {
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000,
           display: 'flex', alignItems: 'center', justifyContent: 'center'
         }}>
-          <div style={{ background: '#1e293b', padding: '24px', borderRadius: '12px', maxWidth: '600px', width: '100%', border: '1px solid #334155', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ background: '#1e293b', padding: '24px', borderRadius: '12px', maxWidth: '750px', width: '95%', border: '1px solid #334155', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div>
                 <h2 style={{ fontSize: '18px', color: '#e8edf5', marginBottom: '4px' }}>🧾 Detalle de Factura</h2>
@@ -396,13 +396,13 @@ export default function ConciliacionPage() {
               <button onClick={() => setDetailModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '18px' }}>✕</button>
             </div>
 
-            <div style={{ overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+            <div style={{ overflowY: 'auto', overflowX: 'hidden', flex: 1, paddingRight: '8px' }}>
               {detailLoading ? (
                 <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Cargando artículos...</div>
               ) : detailItems.length === 0 ? (
                 <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>No se encontraron artículos para esta factura.</div>
               ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', tableLayout: 'auto' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid #334155', color: '#94a3b8', textAlign: 'left' }}>
                       <th style={{ padding: '8px', fontWeight: '500' }}>Descripción</th>
