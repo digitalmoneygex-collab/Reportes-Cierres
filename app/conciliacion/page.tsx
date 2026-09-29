@@ -63,6 +63,12 @@ export default function ConciliacionPage() {
   const [multiAmounts, setMultiAmounts] = useState<Record<string, string>>({});
   const [multiChecks, setMultiChecks] = useState<Record<string, boolean>>({});
 
+  // ── Detalle de Factura Modal ─────────────────────────────────────────────────
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [detailFactura, setDetailFactura] = useState<Factura | null>(null);
+  const [detailItems, setDetailItems] = useState<any[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+
   // ── Filtros locales ─────────────────────────────────────────────────────────
   const [fMetodo, setFMetodo]   = useState('todos');       // método de pago
   const [fEstado, setFEstado]   = useState('todos');       // todos | pendiente | procesada
@@ -88,6 +94,26 @@ export default function ConciliacionPage() {
       })
       .catch(() => {});
   }, []);
+
+  const openDetail = async (f: Factura) => {
+    setDetailFactura(f);
+    setDetailItems([]);
+    setDetailLoading(true);
+    setDetailModalOpen(true);
+    try {
+      const res = await fetch(`/api/pskloud/detalles?documento=${encodeURIComponent(f.documento)}`);
+      const json = await res.json();
+      if (json.ok) {
+        setDetailItems(json.detalles);
+      } else {
+        alert(json.error || 'Error cargando detalles');
+      }
+    } catch {
+      alert('Error de red cargando detalles');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
   // ── Cargar facturas ─────────────────────────────────────────────────────────
   const load = useCallback(async (d: string, currentTurno?: any) => {
@@ -350,6 +376,66 @@ export default function ConciliacionPage() {
                  setSelects(prev => ({...prev, [multiTargetFactura.id]: JSON.stringify(jsonArr)}));
                  setMultiModalOpen(false);
               }}>Guardar Desglose</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Detalles de Factura */}
+      {detailModalOpen && detailFactura && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <div style={{ background: '#1e293b', padding: '24px', borderRadius: '12px', maxWidth: '600px', width: '100%', border: '1px solid #334155', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div>
+                <h2 style={{ fontSize: '18px', color: '#e8edf5', marginBottom: '4px' }}>🧾 Detalle de Factura</h2>
+                <p style={{ color: '#94a3b8', fontSize: '13px' }}>Documento: <strong style={{color:'#818cf8'}}>{detailFactura.documento}</strong></p>
+              </div>
+              <button onClick={() => setDetailModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '18px' }}>✕</button>
+            </div>
+
+            <div style={{ overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+              {detailLoading ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Cargando artículos...</div>
+              ) : detailItems.length === 0 ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>No se encontraron artículos para esta factura.</div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #334155', color: '#94a3b8', textAlign: 'left' }}>
+                      <th style={{ padding: '8px', fontWeight: '500' }}>Descripción</th>
+                      <th style={{ padding: '8px', fontWeight: '500', textAlign: 'center' }}>Cant.</th>
+                      <th style={{ padding: '8px', fontWeight: '500', textAlign: 'right' }}>Precio Bs.</th>
+                      <th style={{ padding: '8px', fontWeight: '500', textAlign: 'right' }}>Subtotal Bs.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detailItems.map((it, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid rgba(51,65,85,0.4)' }}>
+                        <td style={{ padding: '10px 8px', color: '#e8edf5' }}>{it.nombre}</td>
+                        <td style={{ padding: '10px 8px', color: '#cbd5e1', textAlign: 'center' }}>{Number(it.cantidad).toFixed(0)}</td>
+                        <td style={{ padding: '10px 8px', color: '#94a3b8', textAlign: 'right' }}>{fmtBs(it.precio)}</td>
+                        <td style={{ padding: '10px 8px', color: '#e8edf5', textAlign: 'right', fontWeight: '500' }}>{fmtBs(it.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#94a3b8', fontSize: '14px' }}>Total Bs.</span>
+                <strong style={{ color: '#e8edf5', fontSize: '18px' }}>Bs. {fmtBs(detailFactura.monto_bs)}</strong>
+              </div>
+              {tasa > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#94a3b8', fontSize: '14px' }}>Total USD (Tasa: {tasa})</span>
+                  <strong style={{ color: '#34d399', fontSize: '16px' }}>$ {(detailFactura.monto_bs / tasa).toFixed(2)}</strong>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -647,7 +733,20 @@ export default function ConciliacionPage() {
                   </div>
 
                   {/* Documento */}
-                  <span style={{ fontSize: '12px', fontFamily: 'monospace', color: '#818cf8', fontWeight: '700' }}>
+                  <span 
+                    onClick={() => openDetail(f)}
+                    style={{ 
+                      fontSize: '12px', 
+                      fontFamily: 'monospace', 
+                      color: '#818cf8', 
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                      textDecorationColor: 'rgba(129,140,248,0.4)',
+                      textUnderlineOffset: '3px'
+                    }}
+                    title="Ver detalle de factura"
+                  >
                     {f.documento}
                   </span>
 
