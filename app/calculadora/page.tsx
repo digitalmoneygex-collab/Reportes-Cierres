@@ -36,8 +36,7 @@ export default function CalculadoraPage() {
   const isMatch = target > 0 && Math.abs(diff) < 0.01;
 
   return (
-    <div style={{ background: '#0f172a', minHeight: '100vh', padding: '16px', color: '#e8edf5', fontFamily: 'system-ui, sans-serif' }}>
-      <div style={{ background: '#1e293b', padding: '20px', borderRadius: '12px', border: '1px solid #334155', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+    <div style={{ background: '#1e293b', minHeight: '100vh', width: '100%', padding: '20px', color: '#e8edf5', fontFamily: 'system-ui, sans-serif' }}>
         <h2 style={{ fontSize: '18px', color: '#e8edf5', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 20px 0' }}>
           🧮 Calculadora de Vuelto
         </h2>
@@ -133,7 +132,6 @@ export default function CalculadoraPage() {
               Limpiar todo
             </button>
         </div>
-      </div>
     </div>
   );
 }
