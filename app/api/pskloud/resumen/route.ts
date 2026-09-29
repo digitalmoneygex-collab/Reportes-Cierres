@@ -224,23 +224,39 @@ export async function GET(request: Request) {
     // ── Métodos de Pago Conciliados ───────────────────────────────────────────
     const metodosPago = facturas.filter(f => f.procesado).reduce((acc: any, curr) => {
       if (!curr.metodo_pago) return acc;
-      let metodoPagoReal = curr.metodo_pago;
-      let isDevolucionManual = false;
 
-      if (curr.metodo_pago.startsWith('dev_')) {
-        metodoPagoReal = curr.metodo_pago.replace('dev_', '');
-        isDevolucionManual = true;
+      let subPagos = [];
+      if (curr.metodo_pago.startsWith('[')) {
+        try {
+          subPagos = JSON.parse(curr.metodo_pago);
+        } catch(e) {
+          subPagos = [{ metodo: curr.metodo_pago, monto: Math.abs(Number(curr.monto_bs)) }];
+        }
+      } else {
+        subPagos = [{ metodo: curr.metodo_pago, monto: Math.abs(Number(curr.monto_bs)) }];
       }
 
-      const exists = acc.find((m: any) => m.metodo === metodoPagoReal);
-      const isNegative = curr.tipo_doc === 'DEV' || curr.tipo_doc === 'N/C' || curr.tipo_doc === 'NC' || isDevolucionManual || curr.metodo_pago === 'devolucion';
-      const monto = isNegative ? -Math.abs(Number(curr.monto_bs)) : Math.abs(Number(curr.monto_bs));
+      const isDocNegative = curr.tipo_doc === 'DEV' || curr.tipo_doc === 'N/C' || curr.tipo_doc === 'NC' || curr.metodo_pago === 'devolucion';
 
-      if (exists) {
-        exists.cantidad += 1;
-        exists.totalBs += monto;
-      } else {
-        acc.push({ metodo: metodoPagoReal, cantidad: 1, totalBs: monto });
+      for (let sp of subPagos) {
+        let metodoPagoReal = sp.metodo;
+        let isDevolucionManual = false;
+
+        if (metodoPagoReal.startsWith('dev_')) {
+          metodoPagoReal = metodoPagoReal.replace('dev_', '');
+          isDevolucionManual = true;
+        }
+
+        const isNegative = isDocNegative || isDevolucionManual;
+        const monto = isNegative ? -Math.abs(Number(sp.monto)) : Math.abs(Number(sp.monto));
+
+        const exists = acc.find((m: any) => m.metodo === metodoPagoReal);
+        if (exists) {
+          exists.cantidad += 1;
+          exists.totalBs += monto;
+        } else {
+          acc.push({ metodo: metodoPagoReal, cantidad: 1, totalBs: monto });
+        }
       }
       return acc;
     }, []);

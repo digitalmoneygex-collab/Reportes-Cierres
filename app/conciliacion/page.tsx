@@ -57,6 +57,12 @@ export default function ConciliacionPage() {
   const [turnoLoaded, setTurnoLoaded] = useState(false);
   const [checkedRows, setCheckedRows] = useState<Set<string>>(new Set());
 
+  // ── Pagos Múltiples Modal ───────────────────────────────────────────────────
+  const [multiModalOpen, setMultiModalOpen] = useState(false);
+  const [multiTargetFactura, setMultiTargetFactura] = useState<Factura | null>(null);
+  const [multiAmounts, setMultiAmounts] = useState<Record<string, string>>({});
+  const [multiChecks, setMultiChecks] = useState<Record<string, boolean>>({});
+
   // ── Filtros locales ─────────────────────────────────────────────────────────
   const [fMetodo, setFMetodo]   = useState('todos');       // método de pago
   const [fEstado, setFEstado]   = useState('todos');       // todos | pendiente | procesada
@@ -249,6 +255,74 @@ export default function ConciliacionPage() {
           animation: 'fadeIn 0.2s ease',
         }}>
           {toast}
+        </div>
+      )}
+
+      {/* Modal Pagos Múltiples */}
+      {multiModalOpen && multiTargetFactura && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <div style={{ background: '#1e293b', padding: '24px', borderRadius: '12px', maxWidth: '450px', width: '100%', border: '1px solid #334155', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h2 style={{ fontSize: '18px', color: '#e8edf5', marginBottom: '8px' }}>Pagos Múltiples</h2>
+            <p style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '16px' }}>Factura: <strong style={{color:'#818cf8'}}>{multiTargetFactura.documento}</strong> - Total: <strong>Bs. {fmtBs(multiTargetFactura.monto_bs)}</strong></p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+              {METODOS_PAGO.filter(m => m.value !== 'gasto' && !m.value.startsWith('dev_')).map(m => (
+                <div key={m.value} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={!!multiChecks[m.value]}
+                    onChange={e => setMultiChecks(prev => ({...prev, [m.value]: e.target.checked}))}
+                    style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#6366f1' }}
+                  />
+                  <span style={{ color: '#e8edf5', fontSize: '13px', width: '150px' }}>{m.label}</span>
+                  {multiChecks[m.value] && (
+                    <input 
+                      type="number"
+                      placeholder="Monto Bs."
+                      value={multiAmounts[m.value] || ''}
+                      onChange={e => setMultiAmounts(prev => ({...prev, [m.value]: e.target.value}))}
+                      style={{ flex: 1, background: '#0f172a', border: '1px solid #334155', borderRadius: '6px', padding: '6px 10px', color: 'white', outline: 'none', fontSize: '13px' }}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Sum and validation */}
+            {(() => {
+              const sum = Object.keys(multiChecks).filter(k => multiChecks[k]).reduce((s, k) => s + (Number(multiAmounts[k]) || 0), 0);
+              const diff = sum - multiTargetFactura.monto_bs;
+              const isMatch = Math.abs(diff) < 0.01;
+              return (
+                <div style={{ marginBottom: '20px', padding: '12px', background: isMatch ? 'rgba(52,211,153,0.1)' : 'rgba(248,113,113,0.1)', borderRadius: '8px', border: `1px solid ${isMatch ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.3)'}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '12px', color: '#94a3b8' }}>Total ingresado:</span>
+                    <strong style={{ fontSize: '13px', color: isMatch ? '#34d399' : '#f87171' }}>Bs. {fmtBs(sum)}</strong>
+                  </div>
+                  {!isMatch && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '12px', color: '#94a3b8' }}>Desviación:</span>
+                      <strong style={{ fontSize: '13px', color: diff > 0 ? '#fbbf24' : '#f87171' }}>{diff > 0 ? '+' : ''}Bs. {fmtBs(diff)}</strong>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button className="btn btn-ghost" style={{ background: 'transparent', color: '#94a3b8', border: 'none', cursor: 'pointer' }} onClick={() => setMultiModalOpen(false)}>Cancelar</button>
+              <button className="btn btn-primary" style={{ background: '#6366f1', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }} onClick={() => {
+                 const sum = Object.keys(multiChecks).filter(k => multiChecks[k]).reduce((s, k) => s + (Number(multiAmounts[k]) || 0), 0);
+                 if (sum === 0) return alert('Debes ingresar al menos un monto');
+                 const jsonArr = Object.keys(multiChecks).filter(k => multiChecks[k] && Number(multiAmounts[k]) > 0).map(k => ({ metodo: k, monto: Number(multiAmounts[k]) }));
+                 setSelects(prev => ({...prev, [multiTargetFactura.id]: JSON.stringify(jsonArr)}));
+                 setMultiModalOpen(false);
+              }}>Guardar Desglose</button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -488,7 +562,10 @@ export default function ConciliacionPage() {
               const locked    = f.procesado;
               const inProcess = processing[f.id];
               const selected  = selects[f.id] ?? '';
-              const metodoLabel = METODOS_PAGO.find(m => m.value === (f.metodo_pago ?? selected))?.label ?? '—';
+              let metodoLabel = METODOS_PAGO.find(m => m.value === (f.metodo_pago ?? selected))?.label ?? '—';
+              if ((f.metodo_pago ?? selected).startsWith('[')) {
+                metodoLabel = '🧩 Pagos Múltiples';
+              }
 
               return (
                 <div
@@ -567,8 +644,18 @@ export default function ConciliacionPage() {
                     </span>
                   ) : (
                     <select
-                      value={selected || (f.metodo_pago ?? '')}
-                      onChange={e => setSelects(prev => ({ ...prev, [f.id]: e.target.value }))}
+                      value={selected.startsWith('[') ? 'multi' : (selected || (f.metodo_pago ?? ''))}
+                      onChange={e => {
+                         const val = e.target.value;
+                         if (val === 'multi') {
+                            setMultiTargetFactura(f);
+                            setMultiAmounts({});
+                            setMultiChecks({});
+                            setMultiModalOpen(true);
+                         } else {
+                            setSelects(prev => ({ ...prev, [f.id]: val }));
+                         }
+                      }}
                       style={{
                         background: 'rgba(15,23,42,0.9)',
                         border: `1px solid ${selected ? 'rgba(99,102,241,0.5)' : 'rgba(148,163,184,0.15)'}`,
@@ -582,6 +669,7 @@ export default function ConciliacionPage() {
                       {METODOS_PAGO.map(m => (
                         <option key={m.value} value={m.value}>{m.label}</option>
                       ))}
+                      <option value="multi" style={{ background: '#312e81', color: '#a5b4fc', fontWeight: 'bold' }}>🧩 Pagos Múltiples...</option>
                     </select>
                   )}
 
