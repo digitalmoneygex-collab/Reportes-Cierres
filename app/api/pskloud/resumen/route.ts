@@ -280,6 +280,7 @@ export async function GET(request: Request) {
     const g03Items    = allItems.filter(a => a.categoria === 'burguer');
     const g02Items    = allItems.filter(a => a.categoria === 'pasteles');
     const g04Items    = allItems.filter(a => a.categoria === 'reposteria');
+    const g01Items    = allItems.filter(a => a.categoria === 'bebidas');
 
     // ── Burguer: clasificar + calcular insumos ────────────────────────────────
     const burguerCats    = agruparPorCategoria(g03Items, CAT_BURGUER);
@@ -292,6 +293,13 @@ export async function GET(request: Request) {
     // ── Repostería ────────────────────────────────────────────────────────────
     const reposteriaItems = g04Items.map(i => ({ nombre: i.nombre, cantidad: i.cantidad }));
     const reposteriaTotal = reposteriaItems.reduce((acc, i) => acc + i.cantidad, 0);
+
+    // ── Bebidas ───────────────────────────────────────────────────────────────
+    const bebidasSueltas = g01Items.map(i => ({ nombre: i.nombre, cantidad: i.cantidad }));
+    const bebidasSueltasTotal = bebidasSueltas.reduce((acc, i) => acc + i.cantidad, 0);
+    const bebidasEnBurguer = burguerInsumos['Bebida'] || 0;
+    const bebidasEnPasteles = pastelesInsumos['Bebida'] || 0;
+    const bebidasTotal = bebidasSueltasTotal + bebidasEnBurguer + bebidasEnPasteles;
 
     return NextResponse.json({
       ok: true,
@@ -333,6 +341,13 @@ export async function GET(request: Request) {
       reposteria: {
         items: reposteriaItems,
         total: reposteriaTotal,
+      },
+      bebidas: {
+        items: bebidasSueltas,
+        totalSueltas: bebidasSueltasTotal,
+        enBurguer: bebidasEnBurguer,
+        enPasteles: bebidasEnPasteles,
+        total: bebidasTotal,
       },
     });
 

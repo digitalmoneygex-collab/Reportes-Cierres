@@ -37,6 +37,7 @@ interface PskloudData {
     totalesInsumos: Record<string, number>;
   };
   reposteria: { items: RepoItem[]; total: number };
+  bebidas?: { items: RepoItem[]; totalSueltas: number; enBurguer: number; enPasteles: number; total: number };
   metodosPago?: { metodo: string; cantidad: number; totalBs: number }[];
 }
 
@@ -152,7 +153,7 @@ export default function PskloudPanel({ data, loading }: { data: PskloudData | nu
     );
   }
 
-  const { corteCaja, burguer, pasteles, reposteria, metodosPago } = data;
+  const { corteCaja, burguer, pasteles, reposteria, bebidas, metodosPago } = data;
 
   const burguerInsumosKeys = ["PAN BURGUER", "PAN PERRO", "SALCHICHA", "CARNE H", "POLLO", "CARNE M", "TAPA P", "AREPA C", "HUEVO", "BEBIDA", "PAPAS FRITAS 150GR"];
 
@@ -350,6 +351,35 @@ export default function PskloudPanel({ data, loading }: { data: PskloudData | nu
                 />
               ))}
               <Row label="🎂 Total" value={reposteria?.total || <SVal v={0} />} color="#c084fc" isTotal bold />
+            </>
+          );
+        })()}
+      </div>
+
+      {/* ── Bebidas ── */}
+      <div className="card" style={{ marginTop: '24px' }}>
+        <SectionTitle icon="🥤">Bebidas (Análisis)</SectionTitle>
+        <Divider />
+        {(() => {
+          const items = [...(bebidas?.items || [])];
+          return (
+            <>
+              {items.map((item, i) => (
+                <Row 
+                  key={i} 
+                  label={item.nombre} 
+                  value={<SVal v={item.cantidad} />} 
+                  color="#38bdf8" 
+                />
+              ))}
+              
+              {items.length > 0 && <Divider />}
+
+              <Row label="Sueltas" value={<SVal v={bebidas?.totalSueltas || 0} />} color="#38bdf8" />
+              <Row label="En combos Burguer" value={<SVal v={bebidas?.enBurguer || 0} />} color="#38bdf8" />
+              <Row label="En combos Pasteles" value={<SVal v={bebidas?.enPasteles || 0} />} color="#38bdf8" />
+              
+              <Row label="🥤 Total Bebidas" value={bebidas?.total || <SVal v={0} />} color="#38bdf8" isTotal bold />
             </>
           );
         })()}

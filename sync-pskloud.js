@@ -19,7 +19,7 @@ const DB = {
 
 const SUPABASE_URL  = 'https://gztjiljxmbpwzwgbxnru.supabase.co';
 const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6dGppbGp4bWJwd3p3Z2J4bnJ1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjgwMjY4OCwiZXhwIjoyMTAyMzc4Njg4fQ.xnBmQgUSP2YNmxAfJeqMdMxXS5HnvEVTN0uHg0quWT8';
-const INTERVAL_MS   = 5 * 60 * 1000; // 5 minutos
+const INTERVAL_MS   = 20 * 1000; // 20 segundos
 
 // ─── Factores de Insumos ──────────────────────────────────────
 const FACTORES = {
@@ -347,6 +347,7 @@ async function sync() {
            if (g === '03') cat = 'burguer';
            else if (g === '02') cat = 'pasteles';
            else if (g === '04') cat = 'reposteria';
+           else if (g === '01') cat = 'bebidas';
            
            let fechaVal = new Date().toISOString();
            if (r.fechayhora && !isNaN(new Date(r.fechayhora).getTime())) {
@@ -426,6 +427,6 @@ async function sync() {
 const watchMode = process.argv.includes('--watch');
 sync();
 if (watchMode) {
-  console.log(`\nModo Watch activo - sincronizando cada ${INTERVAL_MS / 60000} minutos. Ctrl+C para detener.\n`);
+  console.log(`\nModo Watch activo - sincronizando cada ${INTERVAL_MS / 1000} segundos. Ctrl+C para detener.\n`);
   setInterval(sync, INTERVAL_MS);
 }

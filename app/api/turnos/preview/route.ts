@@ -217,6 +217,7 @@ export async function GET(request: Request) {
     const g03Items     = allItems.filter(a => a.categoria === 'burguer');
     const g02Items     = allItems.filter(a => a.categoria === 'pasteles');
     const g04Items     = allItems.filter(a => a.categoria === 'reposteria');
+    const g01Items     = allItems.filter(a => a.categoria === 'bebidas');
 
     const burguerCats    = agruparPorCategoria(g03Items, CAT_BURGUER);
     const burguerInsumos = calcularTotales(g03Items);
@@ -225,6 +226,13 @@ export async function GET(request: Request) {
     const pastelesInsumos = calcularTotales(g02Items);
 
     const reposteriaItems = g04Items.map(i => ({ nombre: i.nombre, cantidad: i.cantidad }));
+    const reposteriaTotal = reposteriaItems.reduce((acc, i) => acc + i.cantidad, 0);
+
+    const bebidasSueltas = g01Items.map(i => ({ nombre: i.nombre, cantidad: i.cantidad }));
+    const bebidasSueltasTotal = bebidasSueltas.reduce((acc, i) => acc + i.cantidad, 0);
+    const bebidasEnBurguer = burguerInsumos['Bebida'] || 0;
+    const bebidasEnPasteles = pastelesInsumos['Bebida'] || 0;
+    const bebidasTotal = bebidasSueltasTotal + bebidasEnBurguer + bebidasEnPasteles;
 
     // Calcular PSKloud Ventas (Ingresos)
     let totalBs = 0;
@@ -340,7 +348,14 @@ export async function GET(request: Request) {
             grandes: pastelesCats.grandes,
             otros: pastelesCats.otros,
           },
-          reposteria: reposteriaItems
+          reposteria: reposteriaItems,
+          bebidas: {
+            items: bebidasSueltas,
+            totalSueltas: bebidasSueltasTotal,
+            enBurguer: bebidasEnBurguer,
+            enPasteles: bebidasEnPasteles,
+            total: bebidasTotal,
+          }
         },
         insumos: {
           burguer: burguerInsumos,
