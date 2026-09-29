@@ -69,6 +69,8 @@ export default function ConciliacionPage() {
   const [fTipo, setFTipo]       = useState('todos');       // todos | con_asterisco | sin_asterisco | dev
   const [fSearch, setFSearch]   = useState('');            // búsqueda libre
 
+  const [tasa, setTasa] = useState<number>(0);
+
   useEffect(() => {
     fetch('/api/turnos')
       .then(r => r.json())
@@ -78,6 +80,13 @@ export default function ConciliacionPage() {
       })
       .catch(() => {})
       .finally(() => setTurnoLoaded(true));
+
+    fetch('/api/tasa')
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok && d.tasa) setTasa(d.tasa);
+      })
+      .catch(() => {});
   }, []);
 
   // ── Cargar facturas ─────────────────────────────────────────────────────────
@@ -269,31 +278,45 @@ export default function ConciliacionPage() {
             <p style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '16px' }}>Factura: <strong style={{color:'#818cf8'}}>{multiTargetFactura.documento}</strong> - Total: <strong>Bs. {fmtBs(multiTargetFactura.monto_bs)}</strong></p>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
-              {METODOS_PAGO.filter(m => m.value !== 'gasto' && !m.value.startsWith('dev_')).map(m => (
-                <div key={m.value} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={!!multiChecks[m.value]}
-                    onChange={e => setMultiChecks(prev => ({...prev, [m.value]: e.target.checked}))}
-                    style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#6366f1' }}
-                  />
-                  <span style={{ color: '#e8edf5', fontSize: '13px', width: '150px' }}>{m.label}</span>
-                  {multiChecks[m.value] && (
+              {METODOS_PAGO.filter(m => m.value !== 'gasto' && !m.value.startsWith('dev_')).map(m => {
+                const isUsd = ['dolares_efectivo', 'zelle', 'binance'].includes(m.value);
+                return (
+                  <div key={m.value} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <input 
-                      type="number"
-                      placeholder="Monto Bs."
-                      value={multiAmounts[m.value] || ''}
-                      onChange={e => setMultiAmounts(prev => ({...prev, [m.value]: e.target.value}))}
-                      style={{ flex: 1, background: '#0f172a', border: '1px solid #334155', borderRadius: '6px', padding: '6px 10px', color: 'white', outline: 'none', fontSize: '13px' }}
+                      type="checkbox" 
+                      checked={!!multiChecks[m.value]}
+                      onChange={e => setMultiChecks(prev => ({...prev, [m.value]: e.target.checked}))}
+                      style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#6366f1' }}
                     />
-                  )}
-                </div>
-              ))}
+                    <span style={{ color: '#e8edf5', fontSize: '13px', width: '150px' }}>{m.label}</span>
+                    {multiChecks[m.value] && (
+                      <div style={{ flex: 1, position: 'relative' }}>
+                        <input 
+                          type="number"
+                          placeholder={isUsd ? "Monto USD ($)" : "Monto Bs."}
+                          value={multiAmounts[m.value] || ''}
+                          onChange={e => setMultiAmounts(prev => ({...prev, [m.value]: e.target.value}))}
+                          style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '6px', padding: '6px 10px', color: 'white', outline: 'none', fontSize: '13px' }}
+                        />
+                        {isUsd && Number(multiAmounts[m.value]) > 0 && tasa > 0 && (
+                          <div style={{ fontSize: '10px', color: '#34d399', marginTop: '2px', textAlign: 'right' }}>
+                            ~ Bs. {fmtBs(Number(multiAmounts[m.value]) * tasa)}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             {/* Sum and validation */}
             {(() => {
-              const sum = Object.keys(multiChecks).filter(k => multiChecks[k]).reduce((s, k) => s + (Number(multiAmounts[k]) || 0), 0);
+              const getBsValue = (k: string, val: string) => {
+                 const num = Number(val) || 0;
+                 return ['dolares_efectivo', 'zelle', 'binance'].includes(k) && tasa > 0 ? num * tasa : num;
+              };
+              const sum = Object.keys(multiChecks).filter(k => multiChecks[k]).reduce((s, k) => s + getBsValue(k, multiAmounts[k]), 0);
               const diff = sum - multiTargetFactura.monto_bs;
               const isMatch = Math.abs(diff) < 0.01;
               return (
@@ -315,9 +338,15 @@ export default function ConciliacionPage() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
               <button className="btn btn-ghost" style={{ background: 'transparent', color: '#94a3b8', border: 'none', cursor: 'pointer' }} onClick={() => setMultiModalOpen(false)}>Cancelar</button>
               <button className="btn btn-primary" style={{ background: '#6366f1', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }} onClick={() => {
-                 const sum = Object.keys(multiChecks).filter(k => multiChecks[k]).reduce((s, k) => s + (Number(multiAmounts[k]) || 0), 0);
+                 const getBsValue = (k: string, val: string) => {
+                    const num = Number(val) || 0;
+                    return ['dolares_efectivo', 'zelle', 'binance'].includes(k) && tasa > 0 ? num * tasa : num;
+                 };
+                 const sum = Object.keys(multiChecks).filter(k => multiChecks[k]).reduce((s, k) => s + getBsValue(k, multiAmounts[k]), 0);
                  if (sum === 0) return alert('Debes ingresar al menos un monto');
-                 const jsonArr = Object.keys(multiChecks).filter(k => multiChecks[k] && Number(multiAmounts[k]) > 0).map(k => ({ metodo: k, monto: Number(multiAmounts[k]) }));
+                 const jsonArr = Object.keys(multiChecks)
+                   .filter(k => multiChecks[k] && Number(multiAmounts[k]) > 0)
+                   .map(k => ({ metodo: k, monto: getBsValue(k, multiAmounts[k]) }));
                  setSelects(prev => ({...prev, [multiTargetFactura.id]: JSON.stringify(jsonArr)}));
                  setMultiModalOpen(false);
               }}>Guardar Desglose</button>
@@ -327,13 +356,24 @@ export default function ConciliacionPage() {
       )}
 
       {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#e8edf5', letterSpacing: '-0.04em', marginBottom: '4px' }}>
-          📋 Conciliación de Caja
-        </h1>
-        <p style={{ fontSize: '13px', color: '#475569' }}>
-          Asigna el método de pago a cada factura de PSKloud. Una vez procesada, la fila queda bloqueada.
-        </p>
+      <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+        <div>
+          <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#e8edf5', letterSpacing: '-0.04em', marginBottom: '4px' }}>
+            📋 Conciliación de Caja
+          </h1>
+          <p style={{ fontSize: '13px', color: '#475569' }}>
+            Asigna el método de pago a cada factura de PSKloud. Una vez procesada, la fila queda bloqueada.
+          </p>
+        </div>
+        
+        {tasa > 0 && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'linear-gradient(135deg, rgba(251,191,36,0.15) 0%, rgba(245,158,11,0.1) 100%)',
+            border: '1px solid rgba(251,191,36,0.35)', borderRadius: '8px', padding: '6px 16px', fontSize: '14px', fontWeight: '800', color: '#fbbf24'
+          }}>
+            Tasa BCV: Bs. {tasa.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+        )}
       </div>
 
       {/* Filtro fecha + Stats */}
