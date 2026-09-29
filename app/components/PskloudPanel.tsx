@@ -326,7 +326,7 @@ export default function PskloudPanel({ data, loading }: { data: PskloudData | nu
         </div>
       </div>
 
-      {/* ── Repostería ── */}
+      {/* ── Repostería y Bebidas ── */}
       <div className="card">
         <SectionTitle icon="🎂">Repostería</SectionTitle>
         <Divider />
@@ -354,35 +354,34 @@ export default function PskloudPanel({ data, loading }: { data: PskloudData | nu
             </>
           );
         })()}
-      </div>
 
-      {/* ── Bebidas ── */}
-      <div className="card" style={{ marginTop: '24px' }}>
-        <SectionTitle icon="🥤">Bebidas (Análisis)</SectionTitle>
-        <Divider />
-        {(() => {
-          const items = [...(bebidas?.items || [])];
-          return (
-            <>
-              {items.map((item, i) => (
-                <Row 
-                  key={i} 
-                  label={item.nombre} 
-                  value={<SVal v={item.cantidad} />} 
-                  color="#38bdf8" 
-                />
-              ))}
-              
-              {items.length > 0 && <Divider />}
+        <div style={{ marginTop: '32px' }}>
+          <SectionTitle icon="🥤">Bebidas (Análisis)</SectionTitle>
+          <Divider />
+          {(() => {
+            const items = [...(bebidas?.items || [])];
+            return (
+              <>
+                {items.map((item, i) => (
+                  <Row 
+                    key={`beb-${i}`} 
+                    label={item.nombre} 
+                    value={<SVal v={item.cantidad} />} 
+                    color="#38bdf8" 
+                  />
+                ))}
+                
+                {items.length > 0 && <Divider />}
 
-              <Row label="Sueltas" value={<SVal v={bebidas?.totalSueltas || 0} />} color="#38bdf8" />
-              <Row label="En combos Burguer" value={<SVal v={bebidas?.enBurguer || 0} />} color="#38bdf8" />
-              <Row label="En combos Pasteles" value={<SVal v={bebidas?.enPasteles || 0} />} color="#38bdf8" />
-              
-              <Row label="🥤 Total Bebidas" value={bebidas?.total || <SVal v={0} />} color="#38bdf8" isTotal bold />
-            </>
-          );
-        })()}
+                <Row label="Sueltas" value={<SVal v={bebidas?.totalSueltas || 0} />} color="#38bdf8" />
+                <Row label="En combos Burguer" value={<SVal v={bebidas?.enBurguer || 0} />} color="#38bdf8" />
+                <Row label="En combos Pasteles" value={<SVal v={bebidas?.enPasteles || 0} />} color="#38bdf8" />
+                
+                <Row label="🥤 Total Bebidas" value={bebidas?.total || <SVal v={0} />} color="#38bdf8" isTotal bold />
+              </>
+            );
+          })()}
+        </div>
       </div>
     </div>
   );
