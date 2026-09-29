@@ -30,9 +30,20 @@ export default function DashboardPage() {
 
   // Calculadora states
   const [calcOpen, setCalcOpen] = useState(false);
+  const [calcMinimized, setCalcMinimized] = useState(false);
+  const [calcPos, setCalcPos] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
   const [calcTargetBs, setCalcTargetBs] = useState('');
   const [calcAmounts, setCalcAmounts] = useState<Record<string, string>>({});
   const [calcChecks, setCalcChecks] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setCalcPos({ x: Math.max(0, window.innerWidth - 480), y: 80 });
+    }
+  }, []);
 
   const [activeTurno, setActiveTurno] = useState<Turno | null>(null);
   const [turnosList, setTurnosList] = useState<Turno[]>([]);
@@ -356,29 +367,94 @@ export default function DashboardPage() {
   });
   const maxCount = Math.max(...byHour.map(b => b.count), 1);
 
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (e.target instanceof HTMLElement && e.target.closest('button, input, textarea')) return;
+    setIsDragging(true);
+    setDragOffset({
+      x: e.clientX - calcPos.x,
+      y: e.clientY - calcPos.y
+    });
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (isDragging) {
+      setCalcPos({
+        x: e.clientX - dragOffset.x,
+        y: e.clientY - dragOffset.y
+      });
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    setIsDragging(false);
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
   return (
     <div className="animate-fade-in">
-      {/* Calculadora Modal */}
+      {/* Calculadora Flotante */}
       {calcOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: '#1e293b', padding: '24px', borderRadius: '12px', maxWidth: '450px', width: '100%', border: '1px solid #334155', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2 style={{ fontSize: '20px', color: '#e8edf5', display: 'flex', alignItems: 'center', gap: '8px' }}>🧮 Calculadora de Vuelto</h2>
-              <button onClick={() => setCalcOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '18px' }}>✕</button>
+        <div 
+          style={{ 
+            position: 'fixed', 
+            top: calcPos.y, 
+            left: calcPos.x, 
+            zIndex: 9999,
+            background: '#1e293b', 
+            borderRadius: '12px', 
+            width: '400px', 
+            border: '1px solid #334155', 
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
+            display: 'flex', 
+            flexDirection: 'column',
+            overflow: 'hidden'
+          }}
+        >
+          {/* Draggable Header */}
+          <div 
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              padding: '12px 16px',
+              background: '#0f172a',
+              cursor: isDragging ? 'grabbing' : 'grab',
+              userSelect: 'none',
+              borderBottom: '1px solid #334155'
+            }}
+          >
+            <h2 style={{ fontSize: '15px', color: '#e8edf5', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontWeight: '600' }}>
+              🧮 Calculadora de Vuelto
+            </h2>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setCalcMinimized(!calcMinimized)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '14px', padding: '4px' }}>
+                {calcMinimized ? '🗖' : '🗕'}
+              </button>
+              <button onClick={() => setCalcOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '14px', padding: '4px' }}>
+                ✕
+              </button>
             </div>
+          </div>
 
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '6px', display: 'block' }}>Monto total de la factura (Bs.)</label>
-              <input 
-                type="number" 
-                value={calcTargetBs}
-                onChange={e => setCalcTargetBs(e.target.value)}
-                placeholder="Ej: 2727.83"
-                style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '10px 14px', color: 'white', fontSize: '18px', outline: 'none', fontWeight: 'bold' }}
-              />
-            </div>
+          {!calcMinimized && (
+            <div style={{ padding: '20px', maxHeight: '80vh', overflowY: 'auto' }}>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '6px', display: 'block' }}>Monto total de la factura (Bs.)</label>
+                <input 
+                  type="number" 
+                  value={calcTargetBs}
+                  onChange={e => setCalcTargetBs(e.target.value)}
+                  placeholder="Ej: 2727.83"
+                  style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '10px 14px', color: 'white', fontSize: '18px', outline: 'none', fontWeight: 'bold' }}
+                />
+              </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
               {METODOS_PAGO.map(m => {
                 const isUsd = ['dolares_efectivo', 'zelle', 'binance'].includes(m.value);
                 return (
@@ -467,6 +543,7 @@ export default function DashboardPage() {
                <button className="btn btn-ghost" style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: 'none', padding: '6px 16px', borderRadius: '8px' }} onClick={() => { setCalcTargetBs(''); setCalcAmounts({}); setCalcChecks({}); }}>Limpiar todo</button>
             </div>
           </div>
+          )}
         </div>
       )}
       {transferModalOpen && (
