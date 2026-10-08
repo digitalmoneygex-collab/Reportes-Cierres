@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { normalizarNombre } from '@/lib/utils';
+
+function normalizarNombre(nombre: string): string {
+  let nom = String(nombre ?? '').trim().toUpperCase();
+  nom = nom.replace(/TEQUE.O/g, 'TEQUEÑO');
+  nom = nom.replace(/PEQUE.A/g, 'PEQUEÑA');
+  return nom;
+}
 
 export const dynamic = 'force-dynamic';
 
