@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/app/lib/supabase';
-import { normalizarNombre } from '@/app/lib/utils';
+import { supabaseAdmin } from '@/lib/supabase';
+import { normalizarNombre } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
