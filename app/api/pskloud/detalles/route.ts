@@ -20,15 +20,20 @@ export async function GET(request: Request) {
   );
 
   try {
-    const { data, error } = await supabase.storage
+    // URL firmada + cache-buster para evitar que el CDN devuelva una versión vieja del JSON
+    const { data: signed, error } = await supabase.storage
       .from('detalles')
-      .download(`${queryDate}.json`);
+      .createSignedUrl(`${queryDate}.json`, 60);
 
-    if (error) {
+    if (error || !signed?.signedUrl) {
       return NextResponse.json({ ok: true, detalles: [] });
     }
 
-    const jsonText = await data.text();
+    const resp = await fetch(`${signed.signedUrl}&t=${Date.now()}`, { cache: 'no-store' });
+    if (!resp.ok) {
+      return NextResponse.json({ ok: true, detalles: [] });
+    }
+    const jsonText = await resp.text();
     const detallesMap = JSON.parse(jsonText);
 
     // Se asegura de limpiar el documento por si trae espacios (como lo hace sync-pskloud.js)
