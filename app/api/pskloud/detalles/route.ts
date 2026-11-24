@@ -20,20 +20,15 @@ export async function GET(request: Request) {
   );
 
   try {
-    // URL firmada + cache-buster para evitar que el CDN devuelva una versión vieja del JSON
-    const { data: signed, error } = await supabase.storage
+    // Descarga directa con service role (el conector sube el JSON con cacheControl=0)
+    const { data: file, error } = await supabase.storage
       .from('detalles')
-      .createSignedUrl(`${queryDate}.json`, 60);
+      .download(`${queryDate}.json`);
 
-    if (error || !signed?.signedUrl) {
-      return NextResponse.json({ ok: true, detalles: [], debug: 'sin-url-firmada: ' + (error?.message ?? '') + ' fecha=' + queryDate }, { headers: { 'Cache-Control': 'no-store' } });
+    if (error || !file) {
+      return NextResponse.json({ ok: true, detalles: [], debug: 'descarga-fallo: ' + (error?.message ?? 'sin archivo') + ' fecha=' + queryDate }, { headers: { 'Cache-Control': 'no-store' } });
     }
-
-    const resp = await fetch(`${signed.signedUrl}&t=${Date.now()}`, { cache: 'no-store' });
-    if (!resp.ok) {
-      return NextResponse.json({ ok: true, detalles: [], debug: 'descarga-fallo: ' + resp.status + ' fecha=' + queryDate }, { headers: { 'Cache-Control': 'no-store' } });
-    }
-    const jsonText = await resp.text();
+    const jsonText = await file.text();
     const detallesMap = JSON.parse(jsonText);
 
     // Se asegura de limpiar el documento por si trae espacios (como lo hace sync-pskloud.js)
