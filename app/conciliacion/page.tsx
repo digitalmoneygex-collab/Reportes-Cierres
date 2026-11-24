@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useCallback, useEffect, useState } from 'react';
 
@@ -68,6 +68,7 @@ export default function ConciliacionPage() {
   const [detailFactura, setDetailFactura] = useState<Factura | null>(null);
   const [detailItems, setDetailItems] = useState<any[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailDebug, setDetailDebug] = useState('');
 
   // ── Filtros locales ─────────────────────────────────────────────────────────
   const [fMetodo, setFMetodo]   = useState('todos');       // método de pago
@@ -101,10 +102,11 @@ export default function ConciliacionPage() {
     setDetailLoading(true);
     setDetailModalOpen(true);
     try {
-      const res = await fetch(`/api/pskloud/detalles?documento=${encodeURIComponent(f.documento)}&fecha=${encodeURIComponent(f.fecha)}`);
+      const res = await fetch(`/api/pskloud/detalles?documento=${encodeURIComponent(f.documento)}&fecha=${encodeURIComponent(f.fecha)}&_=${Date.now()}`, { cache: 'no-store' });
       const json = await res.json();
       if (json.ok) {
         setDetailItems(json.detalles);
+        setDetailDebug(json.debug || '');
       } else {
         alert(json.error || 'Error cargando detalles');
       }
@@ -400,7 +402,7 @@ export default function ConciliacionPage() {
               {detailLoading ? (
                 <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Cargando artículos...</div>
               ) : detailItems.length === 0 ? (
-                <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>No se encontraron artículos para esta factura.</div>
+                <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>No se encontraron artículos para esta factura.{detailDebug && <div style={{ marginTop: 8, fontSize: 11, color: '#64748b' }}>({detailDebug})</div>}</div>
               ) : (
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', tableLayout: 'auto' }}>
                   <thead>

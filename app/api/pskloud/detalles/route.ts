@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
@@ -26,12 +26,12 @@ export async function GET(request: Request) {
       .createSignedUrl(`${queryDate}.json`, 60);
 
     if (error || !signed?.signedUrl) {
-      return NextResponse.json({ ok: true, detalles: [] });
+      return NextResponse.json({ ok: true, detalles: [], debug: 'sin-url-firmada: ' + (error?.message ?? '') + ' fecha=' + queryDate }, { headers: { 'Cache-Control': 'no-store' } });
     }
 
     const resp = await fetch(`${signed.signedUrl}&t=${Date.now()}`, { cache: 'no-store' });
     if (!resp.ok) {
-      return NextResponse.json({ ok: true, detalles: [] });
+      return NextResponse.json({ ok: true, detalles: [], debug: 'descarga-fallo: ' + resp.status + ' fecha=' + queryDate }, { headers: { 'Cache-Control': 'no-store' } });
     }
     const jsonText = await resp.text();
     const detallesMap = JSON.parse(jsonText);
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
     // Se asegura de limpiar el documento por si trae espacios (como lo hace sync-pskloud.js)
     const docItems = detallesMap[documento.trim()] || [];
     
-    return NextResponse.json({ ok: true, detalles: docItems });
+    return NextResponse.json({ ok: true, detalles: docItems, debug: docItems.length ? undefined : 'doc-no-encontrado: ' + documento + ' fecha=' + queryDate + ' docs=' + Object.keys(detallesMap).length }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error: any) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
