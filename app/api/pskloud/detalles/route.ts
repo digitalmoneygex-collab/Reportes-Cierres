@@ -1,7 +1,7 @@
 ﻿import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -13,28 +13,41 @@ export async function GET(request: Request) {
   }
 
   const queryDate = fecha ? fecha : new Date().toLocaleDateString('en-CA', { timeZone: 'America/Caracas' });
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!.replace(/\/$/, '');
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
   try {
-    // Descarga directa con service role (el conector sube el JSON con cacheControl=0)
-    const { data: file, error } = await supabase.storage
-      .from('detalles')
-      .download(`${queryDate}.json`);
+    // Endpoint autenticado directo con cache-buster (?bust=) para evitar caché de Next.js y CDN
+    const url = `${supabaseUrl}/storage/v1/object/authenticated/detalles/${encodeURIComponent(queryDate)}.json?bust=${Date.now()}`;
+    const resp = await fetch(url, {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        'Cache-Control': 'no-cache, no-store',
+      },
+      cache: 'no-store',
+    });
 
-    if (error || !file) {
-      return NextResponse.json({ ok: true, detalles: [], debug: 'descarga-fallo: ' + (error?.message ?? 'sin archivo') + ' fecha=' + queryDate }, { headers: { 'Cache-Control': 'no-store' } });
+    if (!resp.ok) {
+      return NextResponse.json(
+        { ok: true, detalles: [], debug: `storage-${resp.status} fecha=${queryDate}` },
+        { headers: { 'Cache-Control': 'no-store' } }
+      );
     }
-    const jsonText = await file.text();
-    const detallesMap = JSON.parse(jsonText);
 
-    // Se asegura de limpiar el documento por si trae espacios (como lo hace sync-pskloud.js)
+    const detallesMap = await resp.json();
     const docItems = detallesMap[documento.trim()] || [];
-    
-    return NextResponse.json({ ok: true, detalles: docItems, debug: docItems.length ? undefined : 'doc-no-encontrado: ' + documento + ' fecha=' + queryDate + ' docs=' + Object.keys(detallesMap).length }, { headers: { 'Cache-Control': 'no-store' } });
+
+    return NextResponse.json(
+      {
+        ok: true,
+        detalles: docItems,
+        debug: docItems.length
+          ? undefined
+          : `doc-no-encontrado: ${documento} fecha=${queryDate} docs=${Object.keys(detallesMap).length}`,
+      },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
   } catch (error: any) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
