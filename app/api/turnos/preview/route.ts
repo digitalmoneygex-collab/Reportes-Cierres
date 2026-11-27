@@ -166,8 +166,10 @@ export async function GET(request: Request) {
 
     const normNombre = (s: string): string => {
       let n = String(s ?? '').trim().toUpperCase();
-      n = n.replace(/TEQUE.O/g, 'TEQUEÑO');
-      n = n.replace(/PEQUE.A/g, 'PEQUEÑA');
+      n = n.replace(/Ã[\u0080-\u00BF\u2018\u2019]/g, 'Ñ');
+      n = n.replace(/TEQUEÑOYOS/g, 'TEQUEYOYOS');
+      n = n.replace(/TEQUE[^YÑ]O/g, 'TEQUEÑO');
+      n = n.replace(/PEQUE[^ÑA]A/g, 'PEQUEÑA');
       return n;
     };
 

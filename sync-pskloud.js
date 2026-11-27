@@ -1,15 +1,15 @@
-﻿/**
+/**
  * sync-pskloud.js
- * â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
- * Script LOCAL que corre en la misma PC donde estÃ¡ instalado
- * PSKLOUD (MySQL adminzuilia). Lee los datos del dÃ­a y los sube
+ * ─────────────────────────────────────────────────────────────
+ * Script LOCAL que corre en la misma PC donde está instalado
+ * PSKLOUD (MySQL adminzuilia). Lee los datos del día y los sube
  * a Supabase para que el Dashboard de Vercel los pueda leer.
  */
 
 const mysql = require('mysql2/promise');
 const { createClient } = require('@supabase/supabase-js');
 
-// â”€â”€â”€ ConfiguraciÃ³n â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Configuración ────────────────────────────────────────────
 const DB = {
   host:     'localhost',
   user:     'root',
@@ -21,7 +21,7 @@ const SUPABASE_URL  = 'https://gztjiljxmbpwzwgbxnru.supabase.co';
 const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6dGppbGp4bWJwd3p3Z2J4bnJ1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjgwMjY4OCwiZXhwIjoyMTAyMzc4Njg4fQ.xnBmQgUSP2YNmxAfJeqMdMxXS5HnvEVTN0uHg0quWT8';
 const INTERVAL_MS   = 20 * 1000; // 20 segundos
 
-// â”€â”€â”€ Factores de Insumos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Factores de Insumos ──────────────────────────────────────
 const FACTORES = {
   "AREPA CABIMERA": { "Arepa C": 1, "Carne M": 1, "Huevo": 1 },
   "COMBO 10 HAMB CARNE + BEBIDA": { "Carne H": 10, "Pan Burguer": 10, "Bebida": 1 },
@@ -37,17 +37,17 @@ const FACTORES = {
   "PERRO CALIENTE": { "Pan perro": 1, "Salchicha": 1 },
   "PAPAS FRITAS 150GR": {},
   "PASAPALOS 25UND PASTELES": { "Pieza F": 25 },
-  "PASAPALOS 25UND TEQUEÃ‘OS": { "Pieza F": 25 },
+  "PASAPALOS 25UND TEQUEÑOS": { "Pieza F": 25 },
   "PASAPALOS 50UND PASTELES": { "Pieza F": 50 },
-  "PASAPALOS 50UND TEQUEÃ‘OS": { "Pieza F": 50 },
+  "PASAPALOS 50UND TEQUEÑOS": { "Pieza F": 50 },
   "PASTELES 12 + BEBIDA": { "Pieza P": 12, "Bebida": 1 },
-  "TEQUEÃ‘O 12 + BEBIDAS": { "Pieza P": 12, "Bebida": 1 },
+  "TEQUEÑO 12 + BEBIDAS": { "Pieza P": 12, "Bebida": 1 },
   "COMBO 6 PASTELES MOLIDA": { "Pieza P": 6 },
   "COMBO 6 PASTELES PAPAQUESO": { "Pieza P": 6 },
   "COMBO 6 PASTELES QUESO": { "Pieza P": 6 },
   "COMBO 6 PASTELES VARIADO": { "Pieza P": 6 },
-  "COMBO 6 TEQUEÃ‘OS": { "Pieza P": 6 },
-  "TEQUEÃ‘O": { "Pieza G": 1 },
+  "COMBO 6 TEQUEÑOS": { "Pieza P": 6 },
+  "TEQUEÑO": { "Pieza G": 1 },
   "EMPANADA MECHADA": { "Pieza G": 1 },
   "EMPANADA PAPAQUESO": { "Pieza G": 1 },
   "EMPANADA QUESO": { "Pieza G": 1 },
@@ -60,14 +60,14 @@ const FACTORES = {
   "PASTEL PIZZA": { "Pieza G": 1 },
   "PASTEL QUESO": { "Pieza G": 1 },
   "SALSA GRANDE": {},
-  "SALSA PEQUEÃ‘A": {},
+  "SALSA PEQUEÑA": {},
   "NESCAFE+MILHOJA": {},
   "BRAZO GITANO": {},
   "BOMBA": {},
   "MILHOJAS RELLENA": {}
 };
 
-// â”€â”€â”€ CategorÃ­as Definidas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Categorías Definidas ──────────────────────────────────────
 const CAT_BURGUER = {
   combosHamb: ["COMBO 10 HAMB CARNE + BEBIDA", "COMBO 14 HAMB CARNE + BEBIDA", "COMBO 7 HAMB CARNE + BEBIDA"],
   hambSueltas: ["HAMB. DOBLE CARNE", "HAMB. POLLO ESPECIAL", "HAMB. MIXTA", "HAMB. POLLO", "HAMB. PAPICHYS", "HAMB. CARNE"],
@@ -76,20 +76,22 @@ const CAT_BURGUER = {
 };
 
 const CAT_PASTELES = {
-  pasapalos: ["PASAPALOS 25UND PASTELES", "PASAPALOS 25UND TEQUEÃ‘OS", "PASAPALOS 50UND PASTELES", "PASAPALOS 50UND TEQUEÃ‘OS", "PASAPALOS TEQUE YOYO X50"],
-  pequenos: ["PASTELES 12 + BEBIDA", "TEQUEÃ‘O 12 + BEBIDAS", "COMBO 6 PASTELES MOLIDA", "COMBO 6 PASTELES PAPAQUESO", "COMBO 6 PASTELES QUESO", "COMBO 6 PASTELES VARIADO", "COMBO 6 TEQUEÃ‘OS"],
+  pasapalos: ["PASAPALOS 25UND PASTELES", "PASAPALOS 25UND TEQUEÑOS", "PASAPALOS 50UND PASTELES", "PASAPALOS 50UND TEQUEÑOS", "PASAPALOS TEQUE YOYO X50"],
+  pequenos: ["PASTELES 12 + BEBIDA", "TEQUEÑO 12 + BEBIDAS", "COMBO 6 PASTELES MOLIDA", "COMBO 6 PASTELES PAPAQUESO", "COMBO 6 PASTELES QUESO", "COMBO 6 PASTELES VARIADO", "COMBO 6 TEQUEÑOS"],
   empanadas: ["EMPANADA MECHADA", "EMPANADA PAPAQUESO", "EMPANADA QUESO"],
-  grandes: ["PASTEL PAPAQUESO", "PASTEL MOLIDA", "PASTEL MECHADA", "PASTEL PIZZA", "PASTEL QUESO", "TEQUEÃ‘O"],
-  otros: ["MANDOCAS X UND", "TEQUEYOYOS", "SALSA GRANDE", "SALSA PEQUEÃ‘A"]
+  grandes: ["PASTEL PAPAQUESO", "PASTEL MOLIDA", "PASTEL MECHADA", "PASTEL PIZZA", "PASTEL QUESO", "TEQUEÑO"],
+  otros: ["MANDOCAS X UND", "TEQUEYOYOS", "SALSA GRANDE", "SALSA PEQUEÑA"]
 };
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Helpers ──────────────────────────────────────────────────
 const n = (s) => String(s ?? '').trim().toUpperCase();
 
 function normalizarNombre(nombre) {
   let nom = n(nombre);
-  nom = nom.replace(/TEQUE.O/g, 'TEQUEÃ‘O');
-  nom = nom.replace(/PEQUE.A/g, 'PEQUEÃ‘A');
+  nom = nom.replace(/Ã[\u0080-\u00BF\u2018\u2019]/g, 'Ñ');
+  nom = nom.replace(/TEQUEÑOYOS/g, 'TEQUEYOYOS');
+  nom = nom.replace(/TEQUE[^YÑ]O/g, 'TEQUEÑO');
+  nom = nom.replace(/PEQUE[^ÑA]A/g, 'PEQUEÑA');
   return nom;
 }
 
@@ -139,7 +141,7 @@ function agruparPorCategoria(rows, catDict) {
   return res;
 }
 
-// â”€â”€â”€ LÃ³gica principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Lógica principal ─────────────────────────────────────────
 function fechaVenezuela() {
   const now = new Date();
   const vzOffset = -4 * 60;
@@ -161,7 +163,7 @@ async function sync() {
     conn = await mysql.createConnection(DB);
     console.log('  OK Conexion MySQL establecida');
 
-    // â”€â”€ Total Ingresos (ventas facturadas) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Total Ingresos (ventas facturadas) ────────────────────
     const [[totalRow]] = await conn.query(
       `SELECT COALESCE(SUM(monto), 0) AS total
        FROM operclit
@@ -171,15 +173,15 @@ async function sync() {
     );
     const totalBs = Number(totalRow?.total ?? 0);
 
-    // Debug: ver quÃ© tipodoc hay realmente hoy
+    // Debug: ver qué tipodoc hay realmente hoy
     const [tiposDoc] = await conn.query(
       `SELECT DISTINCT tipodoc FROM operclit WHERE DATE(fecha) = ?`,
       [today]
     );
     console.log(`  INFO Tipos de documento encontrados hoy en operclit:`, tiposDoc.map(r => r.tipodoc).join(', '));
 
-    // â”€â”€ Devoluciones en Efectivo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    // Las notas de crÃ©dito/devoluciones se guardan en la cabecera (operti), no en operclit.
+    // ── Devoluciones en Efectivo ───────────────────────────────
+    // Las notas de crédito/devoluciones se guardan en la cabecera (operti), no en operclit.
     const [[devRow]] = await conn.query(
       `SELECT COALESCE(SUM(totalfinal), 0) AS total_dev
        FROM operti
@@ -232,7 +234,7 @@ async function sync() {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // â”€â”€ Subir snapshot del dÃ­a â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Subir snapshot del día ─────────────────────────────────
     const { error } = await supabase
       .from('pskloud_snapshot')
       .upsert(payload, { onConflict: 'fecha' });
@@ -243,7 +245,7 @@ async function sync() {
       console.log('  OK Snapshot subido a Supabase correctamente');
     }
 
-    // â”€â”€ Subir facturas individuales (para ConciliaciÃ³n) â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Subir facturas individuales (para Conciliación) ────────
     // Primero descubrir los nombres reales de las columnas en operclit
     const [colRows] = await conn.query(
       `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
@@ -254,13 +256,13 @@ async function sync() {
     const colNames = colRows.map(r => String(r.COLUMN_NAME).toLowerCase());
     console.log(`  INFO Columnas de operclit: ${colNames.join(', ')}`);
 
-    // Resolver nombre del nÃºmero de documento (distintas versiones de PSKloud)
+    // Resolver nombre del número de documento (distintas versiones de PSKloud)
     const colDoc   = ['nrodoc','numdoc','documento','ndoc','cod_doc','codoc'].find(c => colNames.includes(c)) || null;
     // Resolver nombre del cliente
     const colCli   = ['nomcli','nombre_cliente','nomcliente','cliente','nom_cli'].find(c => colNames.includes(c)) || null;
 
     if (!colDoc) {
-      console.warn('  WARN No se encontrÃ³ columna de documento en operclit. Columnas disponibles:', colNames.join(', '));
+      console.warn('  WARN No se encontró columna de documento en operclit. Columnas disponibles:', colNames.join(', '));
       console.warn('  WARN Saltando subida de facturas. Ajusta sync-pskloud.js con el nombre correcto.');
     } else {
       const selectDoc = `oc.\`${colDoc}\``;
@@ -322,7 +324,7 @@ async function sync() {
         console.log('  INFO Sin facturas para subir hoy');
       }
       
-      // â”€â”€ Subir artÃ­culos detallados para turnos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ── Subir artículos detallados para turnos ─────────────────
       // Join con operclit para capturar la hora EXACTA de la factura (fechayhora real)
       const selectJoinDoc = colDoc ? `c.\`${colDoc}\`` : `c.documento`;
       const selectDocArt = colDoc ? `m.\`${colDoc}\`` : `m.documento`;

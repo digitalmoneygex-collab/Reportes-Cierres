@@ -3,8 +3,10 @@ import { supabaseAdmin } from '@/lib/supabase';
 
 function normalizarNombre(nombre: string): string {
   let nom = String(nombre ?? '').trim().toUpperCase();
-  nom = nom.replace(/TEQUE.O/g, 'TEQUEÑO');
-  nom = nom.replace(/PEQUE.A/g, 'PEQUEÑA');
+  nom = nom.replace(/Ã[\u0080-\u00BF\u2018\u2019]/g, 'Ñ');
+  nom = nom.replace(/TEQUEÑOYOS/g, 'TEQUEYOYOS');
+  nom = nom.replace(/TEQUE[^YÑ]O/g, 'TEQUEÑO');
+  nom = nom.replace(/PEQUE[^ÑA]A/g, 'PEQUEÑA');
   return nom;
 }
 
